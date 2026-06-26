@@ -4,3 +4,5 @@ main.py
 test_users.py
 /reports
 /cli
+logs/
+routers/__pycache__/
