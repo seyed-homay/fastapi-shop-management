@@ -129,6 +129,15 @@ def search_product(keyword):
     except Exception as e:
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
+    
+@router.get("/admin/analytics/total-sales")
+def total_sales():
+    return {"total_sales":500000}
+
+
+
+
+
 @router.post("/products")
 def create_product(product_data: ProductCreate, admin_status: str = Depends(verify_admin)):
     try:
