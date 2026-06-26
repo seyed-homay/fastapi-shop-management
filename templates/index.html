@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>مدیریت انبار مغازه</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #f4f4f9; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
+        th { background-color: #007bff; color: white; position: sticky; top: 0; } /* هدر جدول با اسکرول بالا می‌ماند */
+        .form-group { margin-bottom: 15px; }
+        input, select { padding: 8px; width: 160px; margin-left: 10px; }
+        button { padding: 8px 15px; background-color: #28a745; color: white; border: none; cursor: pointer; }
+        .table-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid #ccc; margin-top: 20px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>سیستم انبارداری مغازه</h2>
+        <div id="login-section" style="border: 2px solid #007bff; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fff; max-width: 400px;">
+        <h3>🔑 ورود به سیستم</h3>
+        <div class="form-group">
+        <input type="text" id="login_username" placeholder="نام کاربری">
+        <input type="password" id="login_password" placeholder="رمز عبور">
+        <button onclick="loginUser()" style="background-color: #007bff;">ورود</button>
+    </div>
+</div>
+        <h3>ثبت کالای جدید</h3>
+        <div class="form-group">
+            <input type="text" id="p_name" placeholder="نام کالا">
+            <input type="number" id="p_price" placeholder="قیمت">
+            <input type="number" id="p_qty" placeholder="تعداد">
+            <input type="number" id="p_cat" placeholder="آیدی دسته‌بندی">
+            <button onclick="addProduct()">ثبت کالا</button>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <input type="text" id="search_input" oninput="searchProducts()" placeholder="🔍 جستجوی سریع نام کالا..." style="width: 100%; max-width: 300px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+        <h3>لیست موجودی انبار</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>آیدی</th>
+                        <th>نام کالا</th>
+                        <th>قیمت</th>
+                        <th>موجودی</th>
+                        <th>عملیات</th> 
+                    </tr>
+                </thead>
+                <tbody id="products_table">
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="border: 2px solid #333; padding: 15px; margin-top: 20px; border-radius: 8px; background: #fff; max-width: 500px;">
+            <h3>📋 فاکتور فروش سریع</h3>
+            <div id="invoice-container">
+                <p style="color: #888;">فاکتور خالی است. کالایی اضافه کنید.</p>
+            </div>
+            <hr>
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.2em; margin-bottom: 15px;">
+                <span>مجموع کل فاکتور:</span>
+                <span><span id="total-price">0</span> تومان</span>
+            </div>
+            <button onclick="submitInvoice()" style="background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 1.1em; font-weight: bold;">
+                💸 ثبت و تسویه نهایی فاکتور
+            </button>
+        </div>
+        
+    </div>
+
+    <script>
+        // آرایه برای نگهداری آیتم‌های فاکتور جاری
+        let invoiceItems = [];
+        let currentUser = { role: "user" };
+        let token ="";
+        async function loadProducts() {
+            const response = await fetch("/products")
+            const data = await response.json();
+            const tableBody = document.getElementById("products_table");
+            tableBody.innerHTML = ""; // خالی کردن جدول قبل از رندر مجدد
+            data.forEach(product => {
+                tableBody.innerHTML += `
+                <tr>
+                    <td>${product.id}</td>
+                    <td>${product.name}</td>
+                    <td>${product.price.toLocaleString()}</td>
+                    <td>${product.quantity}</td>
+                    <td>
+                        <button onclick="editQuantity(${product.id}, ${product.quantity})" 
+                        style="background-color: #28a745; color: white; padding: 5px 10px; border: none; 
+                        border-radius: 4px; cursor: pointer; margin-left: 5px;">ویرایش</button>
+                        
+                        <button onclick="addToInvoice(${product.id}, '${product.name}', ${product.price}, ${product.quantity})" 
+                        style="background-color: #007bff; color: white; padding: 5px 10px; border: none;
+                        border-radius: 4px; cursor: pointer; margin-left: 5px;">+ افزودن به فاکتور</button>
+                        
+                        <button onclick="deleteProduct(${product.id}, '${currentUser.role}')" 
+                        style="background-color: #dc3545; color: white; padding: 5px 10px; border: none; 
+                        border-radius: 4px; cursor: pointer;">حذف</button>
+                    </td>
+                </tr>
+                `;
+            });
+        }
+
+        // تابع مدیریت فاکتور: افزودن کالا به لیست فاکتور
+        function addToInvoice(id, name, price, maxQty) {
+            const existingItem = invoiceItems.find(item => item.product_id === id);
+            
+            if (existingItem) {
+                if (existingItem.sold_quantity < maxQty) {
+                    existingItem.sold_quantity += 1;
+                } else {
+                    alert("تعداد درخواستی بیشتر از موجودی انبار است!");
+                    return;
+                }
+            } else {
+                if (maxQty > 0) {
+                    invoiceItems.push({
+                        product_id: id,
+                        name: name,
+                        price: price,
+                        sold_quantity: 1,
+                        max_qty: maxQty
+                    });
+                } else {
+                    alert("موجودی این کالا در انبار صفر است!");
+                    return;
+                }
+            }
+            renderInvoice();
+        }
+
+        // تابع مدیریت فاکتور: تغییر تعداد از داخل کادر فاکتور
+        function updateInvoiceQty(id, newQty) {
+            const item = invoiceItems.find(item => item.product_id === id);
+            if (!item) return;
+            
+            const qty = parseInt(newQty);
+            if (qty <= 0) {
+                invoiceItems = invoiceItems.filter(i => i.product_id !== id);
+            } else if (qty > item.max_qty) {
+                alert("بیشتر از موجودی انبار امکان‌پذیر نیست!");
+                item.sold_quantity = item.max_qty;
+            } else {
+                item.sold_quantity = qty;
+            }
+            renderInvoice();
+        }
+
+        // تابع مدیریت فاکتور: رندر و به‌روزرسانی زنده ظاهر فاکتور
+        function renderInvoice() {
+            const container = document.getElementById("invoice-container");
+            if (invoiceItems.length === 0) {
+                container.innerHTML = "<p style='color: #888;'>فاکتور خالی است. کالایی اضافه کنید.</p>";
+                document.getElementById("total-price").innerText = "0";
+                return;
+            }
+            
+            let html = "<table style='width:100%; border-collapse: collapse;'>";
+            html += "<tr style='background:#f2f2f2;'><th>کالا</th><th>تعداد</th><th>قیمت</th><th>جمع</th></tr>";
+            
+            let totalInvoicePrice = 0;
+            
+            invoiceItems.forEach(item => {
+                const itemTotal = item.price * item.sold_quantity;
+                totalInvoicePrice += itemTotal;
+                
+                html += `<tr style='border-bottom: 1px solid #ddd; text-align:center;'>
+                    <td>${item.name}</td>
+                    <td>
+                        <input type='number' value='${item.sold_quantity}' min='0' style='width:50px; text-align:center;' 
+                        onchange='updateInvoiceQty(${item.product_id}, this.value)'>
+                    </td>
+                    <td>${item.price.toLocaleString()}</td>
+                    <td>${itemTotal.toLocaleString()}</td>
+                </tr>`;
+            });
+            
+            html += "</table>";
+            container.innerHTML = html;
+            document.getElementById("total-price").innerText = totalInvoicePrice.toLocaleString();
+        }
+
+        // تابع مدیریت فاکتور: ارسال آرایه نهایی به سرور پایتون
+        async function submitInvoice() {
+            if (invoiceItems.length === 0) {
+                alert("فاکتور خالی است!");
+                return;
+            }
+            
+            const payload = invoiceItems.map(item => ({
+                product_id: item.product_id,
+                sold_quantity: item.sold_quantity
+            }));
+            
+            const response = await fetch("/product/invoice/sell", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (response.ok) {
+                alert("فاکتور با موفقیت ثبت و از انبار کم شد.");
+                invoiceItems = [];
+                location.reload();
+            } else {
+                const errorData = await response.json();
+                alert(errorData.detail || "خطا در ثبت فاکتور!");
+            }
+        }
+
+        async function addProduct() {
+            const name = document.getElementById("p_name").value;
+            const price = document.getElementById("p_price").value;
+            const qty = document.getElementById("p_qty").value;
+            const category = document.getElementById("p_cat").value;
+
+            const response = await fetch(`/products?token=${my_token}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    name: name,
+                    price: parseFloat(price),
+                    quantity: parseInt(qty),
+                    category_id: parseInt(category)
+                })
+            });
+        
+            if (response.ok) {
+                location.reload(); 
+            } else {
+                alert("خطا در ثبت کالا!");
+            }
+        }
+
+        async function deleteProduct(product_id){
+            if (confirm("آیا از حذف کالا مطمئن هستید؟")){
+                const response = await fetch(`/products/${product_id}?token=${my_token}`,{method : "DELETE"})
+                if (response.ok){
+                    location.reload();
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.detail || "خطا در حذف کالا!");
+                }
+            }
+        }
+
+        async function editQuantity(product_id, current_qty) {
+            const newQuantity = prompt(`موجودی فعلی: ${current_qty}\nموجودی جدید را وارد کنید:`, current_qty);
+            if (newQuantity === null || newQuantity.trim() === "") return;
+        
+            const newPrice = prompt("قیمت جدید کالا را وارد کنید:");
+            if (newPrice === null || newPrice.trim() === "") return;
+        
+            const response = await fetch(`/product/${product_id}/${parseFloat(newPrice)}/${parseInt(newQuantity)}?token=${my_token}`, {
+                method: "PUT"
+            });
+        
+            if (response.ok) {
+                location.reload(); 
+            } else {
+                const errorData = await response.json();
+                alert(errorData.detail || "خطا در ویرایش کالا!");
+            }
+        }
+        async function searchProducts() {
+    const keyword = document.getElementById("search_input").value;
+    
+    // اگر کادر سرچ خالی شد، دوباره کل محصولات انبار رو لود کن
+    if (keyword.trim() === "") {
+        loadProducts();
+        return;
+    }
+    
+    // درخواست به روت پایتونی که خودت ساختی
+    const response = await fetch(`/product/search?keyword=${encodeURIComponent(keyword)}`);
+    
+        if (response.ok) {
+            const data = await response.json();
+            const tableBody = document.getElementById("products_table");
+            tableBody.innerHTML = ""; // اول جدول قبلی رو پاک میکنیم
+
+            // حالا دیتای جدیدی که پایتون فیلتر کرده رو توی جدول رندر میکنیم
+            data.forEach(product => {
+                tableBody.innerHTML += `
+                <tr>
+                    <td>${product.id}</td>
+                    <td>${product.name}</td>
+                    <td>${product.price.toLocaleString()}</td>
+                    <td>${product.quantity}</td>
+                    <td>
+                        <button onclick="editQuantity(${product.id}, ${product.quantity})" 
+                        style="background-color: #28a745; color: white; padding: 5px 10px; border: none; 
+                        border-radius: 4px; cursor: pointer; margin-left: 5px;">ویرایش</button>
+
+                        <button onclick="addToInvoice(${product.id}, '${product.name}', ${product.price}, ${product.quantity})" 
+                        style="background-color: #007bff; color: white; padding: 5px 10px; border: none;
+                        border-radius: 4px; cursor: pointer; margin-left: 5px;">+ افزودن به فاکتور</button>
+
+                        <button onclick="deleteProduct(${product.id})" 
+                        style="background-color: #dc3545; color: white; padding: 5px 10px; border: none; 
+                        border-radius: 4px; cursor: pointer;">حذف</button>
+                    </td>
+                </tr>
+                `;
+            });
+        }
+    }
+async function searchProducts() {
+    const keyword = document.getElementById("search_input").value;
+    
+    // اگر کادر سرچ خالی شد، دوباره کل محصولات انبار رو لود کن
+    if (keyword.trim() === "") {
+        loadProducts();
+        return;
+    }
+    
+    // درخواست به روت پایتونی که خودت ساختی
+    const response = await fetch(`/product/search?keyword=${encodeURIComponent(keyword)}`);
+    
+    if (response.ok) {
+        const data = await response.json();
+        const tableBody = document.getElementById("products_table");
+        tableBody.innerHTML = ""; // اول جدول قبلی رو پاک میکنیم
+        
+        // حالا دیتای جدیدی که پایتون فیلتر کرده رو توی جدول رندر میکنیم
+        data.forEach(product => {
+            tableBody.innerHTML += `
+            <tr>
+                <td>${product.id}</td>
+                <td>${product.name}</td>
+                <td>${product.price.toLocaleString()}</td>
+                <td>${product.quantity}</td>
+                <td>
+                    <button onclick="editQuantity(${product.id}, ${product.quantity})" 
+                    style="background-color: #28a745; color: white; padding: 5px 10px; border: none; 
+                    border-radius: 4px; cursor: pointer; margin-left: 5px;">ویرایش</button>
+                    
+                    <button onclick="addToInvoice(${product.id}, '${product.name}', ${product.price}, ${product.quantity})" 
+                    style="background-color: #007bff; color: white; padding: 5px 10px; border: none;
+                    border-radius: 4px; cursor: pointer; margin-left: 5px;">+ افزودن به فاکتور</button>
+                    
+                    <button onclick="deleteProduct(${product.id})" 
+                    style="background-color: #dc3545; color: white; padding: 5px 10px; border: none; 
+                    border-radius: 4px; cursor: pointer;">حذف</button>
+                </td>
+            </tr>
+            `;
+        });
+    }
+}
+
+async function loginUser() {
+    const username = document.getElementById("login_username").value;
+    const password = document.getElementById("login_password").value;
+    
+    const response = await fetch("/users/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password
+        })
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        my_token = data.token;
+        
+        alert(`${data.message} \nنقش شما: ${data.role}`);
+        // فرم لاگین را مخفی می‌کنه چون کاربر وارد شده
+        document.getElementById("login-section").style.display = "none";
+        currentUser.role = data.role;
+        loadProducts();
+
+    } else {
+        const errorData = await response.json();
+        alert(errorData.detail || "خطا در ورود!");
+    }
+}
+
+        window.onload = loadProducts;
+    </script>
+</body>
+</html>

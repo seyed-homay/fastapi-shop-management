@@ -1,0 +1,9 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": []
+    "terminal.integrated.fontFamily": "Cascadia Mono, Vazirmatn FD, Consolas, Courier New, monospace",
+    "terminal.integrated.gpuAcceleration": "off",
+    "terminal.integrated.fontSize": 15,
+    "terminal.integrated.lineHeight": 1.1,
+
+}
