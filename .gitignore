@@ -2,3 +2,5 @@ csv_item.csv
 inventrory.db
 main.py
 test_users.py
+/reports
+/cli
