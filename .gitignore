@@ -6,4 +6,4 @@ test_users.py
 /cli
 logs/
 routers/__pycache__/
-services/__pycache__
+services/__pycache__/
