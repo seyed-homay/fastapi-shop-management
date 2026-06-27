@@ -7,3 +7,4 @@ test_users.py
 logs/
 routers/__pycache__/
 services/__pycache__/
+__pycache__/

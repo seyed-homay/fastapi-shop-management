@@ -76,6 +76,15 @@ def init_db():
                         ) 
 
                             """)
+        cursor.execute("""
+                       CREATE TABLE IF NOT EXISTS sales(id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       product_id INTEGER,
+                       quantity REAL,
+                       unit_price REAL,
+                       total_price REAL,
+                       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                       FOREIGN KEY (product_id) REFERENCES products(id)
+)""")
         
         conn.commit()
 

@@ -215,7 +215,7 @@ def get_product_price_filter(number):
     finally:
         conn.close()
 
-def get_total_value():
+def get_category_total_value():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -241,7 +241,7 @@ def get_total_value():
     finally:
         conn.close()
     
-
+               
 def sell_product(product_id,buy_quantity):
     conn = get_db_connection()
     try:
@@ -256,13 +256,15 @@ def sell_product(product_id,buy_quantity):
         #                                ,(product_id,)).fetchone()[0]
         query = "UPDATE products SET quantity =? WHERE id = ?"
         new_quantity = old_quantity - buy_quantity
-        
+        price_row = cursor.execute("SELECT price FROM products WHERE id = ?",(product_id,))
+        price = price_row.fetchone()[0]
+        total_price = buy_quantity * price
         cursor.execute(query,(new_quantity,product_id))
-
+        
 
         conn.commit()
         print("product successfully was sold ")
-        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity)
+        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price)
         return True
 
     except Exception as e:

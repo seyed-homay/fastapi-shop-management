@@ -69,6 +69,7 @@ def sell_invoice(cart: List[InvoiceItem]):
             result = product_service.sell_product(pduct.product_id,pduct.sold_quantity)
             if not result:
                 success =False
+                print()
 
         if success:
             return {"status":"success","message":"فاکتور با موفقیت پردازش شد"}
@@ -132,7 +133,9 @@ def search_product(keyword):
     
 @router.get("/admin/analytics/total-sales")
 def total_sales():
-    return {"total_sales":500000}
+    total = product_service.get_category_total_value()
+
+    return total
 
 
 
