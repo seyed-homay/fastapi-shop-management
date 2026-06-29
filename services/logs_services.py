@@ -12,6 +12,7 @@ def insert_user_logs(action,timestamp,user_id):
                         """,(action,timestamp,user_id))
         conn.commit()
         return True
+       
     except Exception as e:
         print("ERROR : " ,e )
         return False

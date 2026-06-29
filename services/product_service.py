@@ -271,5 +271,17 @@ def sell_product(product_id,buy_quantity):
         print("ERROR : ",e)
     finally:
         conn.close()
-    
-
+def get_total_sales():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        
+        total_prices = cursor.execute("""SELECT SUM(total_price) FROM sales WHERE DAtE(timestamp) = DATE(current_timestamp)""")
+        total = total_prices.fetchone()
+        if total == None or total == "null":
+            return {"total_sales" : 0}
+        return {"total_sales":total[0]}
+    except Exception as e:
+        print("ERROR : ",e)
+    finally:
+        conn.close()

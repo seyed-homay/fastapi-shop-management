@@ -133,9 +133,15 @@ def search_product(keyword):
     
 @router.get("/admin/analytics/total-sales")
 def total_sales():
-    total = product_service.get_category_total_value()
+    try:
+        total = product_service.get_total_sales()
 
-    return total
+        return total
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as e:
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
 
 
 
