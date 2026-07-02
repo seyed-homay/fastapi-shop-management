@@ -131,11 +131,23 @@ def search_product(keyword):
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
     
-@router.get("/admin/analytics/total-sales")
-def total_sales():
+@router.get("/admin/analytics/today-total-sales")
+def today_total_sales():
     try:
-        total = product_service.get_total_sales()
+        total = product_service.get_today_total_sales()
+        
+        return total
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as e:
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
 
+@router.get("/admin/analytics/total-sales-withtime")
+def total_sales(first_date,second_date):
+    try:
+        total = product_service.get_total_sales_with_time(first_date,second_date)
+        
         return total
     except HTTPException as http_err:
         raise http_err

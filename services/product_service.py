@@ -271,17 +271,32 @@ def sell_product(product_id,buy_quantity):
         print("ERROR : ",e)
     finally:
         conn.close()
-def get_total_sales():
+def get_today_total_sales():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         
-        total_prices = cursor.execute("""SELECT SUM(total_price) FROM sales WHERE DAtE(timestamp) = DATE(current_timestamp)""")
-        total = total_prices.fetchone()
-        if total == None or total == "null":
-            return {"total_sales" : 0}
+        today_total_prices = cursor.execute("""SELECT SUM(total_price) FROM sales WHERE DAtE(timestamp) = DATE(current_timestamp)""")
+        today_total = today_total_prices.fetchone()[0]
+        if today_total == None or today_total == "null":
+            return {"total_sales" : 0} 
+        return {"total_sales":today_total[0]}
+    except Exception as e:
+        print("ERROR : ",e)
+    finally:
+        conn.close()
+def get_total_sales_with_time(first_date:str,second_date:str):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        total_price = cursor.execute("""SELECT SUM(total_price) FROM sales WHERE DAtE(timestamp) BETWEEN ? AND ?""",
+                                     (first_date,second_date))
+        total = total_price.fetchone()
+        if total[0] == "null" or total[0] == None:
+            return {"total_sales":0}
         return {"total_sales":total[0]}
     except Exception as e:
         print("ERROR : ",e)
     finally:
         conn.close()
+        
