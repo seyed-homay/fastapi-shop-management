@@ -7,7 +7,7 @@ from db import get_db_connection
 
 
 
-def add_product(name,price,quantity,category_id):
+def add_product(name,price,quantity,category_id,purchase_price):
 
     if price < 0 or quantity < 0 :
 
@@ -19,9 +19,9 @@ def add_product(name,price,quantity,category_id):
 
         cursor = conn.cursor()
 
-        cursor.execute("INSERT INTO products(name, price, quantity, category_id) VALUES (?,?,?,?)"
+        cursor.execute("INSERT INTO products(name, price, quantity, category_id,purchase_price) VALUES (?,?,?,?,?)"
                        
-                       ,(name,price,quantity,category_id))
+                       ,(name,price,quantity,category_id,purchase_price))
         product_id =cursor.lastrowid
         conn.commit()
         logs_services.add_product("add_product",product_id)
@@ -88,7 +88,7 @@ def add_multiple_products(products):
             else:
                 formatted_products.append(p)
 
-        cursor.executemany("INSERT INTO products(name,price,quantity,category_id) VALUES (?,?,?,?)",products)
+        cursor.executemany("INSERT INTO products(name,price,quantity,category_id,purchase_price) VALUES (?,?,?,?,?)",products)
 
         print("Insert into product is succesfull")
 
@@ -101,6 +101,7 @@ def add_multiple_products(products):
         print("Failed to insert products due to integrity error:", e)
         
         return False
+    
     except Exception as e:
         print("Unexpected error:", e)
         return False
@@ -260,11 +261,11 @@ def sell_product(product_id,buy_quantity):
         price = price_row.fetchone()[0]
         total_price = buy_quantity * price
         cursor.execute(query,(new_quantity,product_id))
-        
-
+        purchase_price = cursor.execute("SELECT purchase_price FROM products WHERE id =?",(product_id,))
+        purchase=purchase_price.fetchone()[0]
         conn.commit()
         print("product successfully was sold ")
-        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price)
+        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price,purchase)
         return True
 
     except Exception as e:

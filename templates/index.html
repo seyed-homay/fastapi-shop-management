@@ -29,7 +29,8 @@
         <h3>ثبت کالای جدید</h3>
         <div class="form-group">
             <input type="text" id="p_name" placeholder="نام کالا">
-            <input type="number" id="p_price" placeholder="قیمت">
+            <input type="number" id="p_price" placeholder="قیمت فروش">
+            <input type="number" id="b_price" placeholder="قیمت خرید">
             <input type="number" id="p_qty" placeholder="تعداد">
             <input type="number" id="p_cat" placeholder="آیدی دسته‌بندی">
             <button onclick="addProduct()">ثبت کالا</button>
@@ -220,6 +221,7 @@
             const price = document.getElementById("p_price").value;
             const qty = document.getElementById("p_qty").value;
             const category = document.getElementById("p_cat").value;
+            const purchase = document.getElementById("b_price").value;
 
             const response = await fetch(`/products?token=${my_token}`, {
                 method: "POST",
@@ -230,7 +232,8 @@
                     name: name,
                     price: parseFloat(price),
                     quantity: parseInt(qty),
-                    category_id: parseInt(category)
+                    category_id: parseInt(category),
+                    purchase_price : parseInt(purchase)
                 })
             });
         

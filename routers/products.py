@@ -8,6 +8,7 @@ class ProductCreate(BaseModel):
     price: float
     quantity: int
     category_id: int # اختیاری
+    purchase_price: float
     
 
 class InvoiceItem(BaseModel):
@@ -60,6 +61,8 @@ def get_product(product_id: int):
         
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")
+    
+
 @router.post("/product/invoice/sell")
 def sell_invoice(cart: List[InvoiceItem]):
 
@@ -81,9 +84,6 @@ def sell_invoice(cart: List[InvoiceItem]):
         print(f"Database Error: {e}")
 
         raise HTTPException(status_code=500,detail="خطای داخلی سرور در اضافه کردن ایتم به فاکتور")
-
-
-    
 
 
 @router.get("/products")
@@ -116,7 +116,6 @@ def get_all_products():
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")
 
-
 @router.get("/product/search")
 def search_product(keyword):
     try:
@@ -143,6 +142,7 @@ def today_total_sales():
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
 
+
 @router.get("/admin/analytics/total-sales-withtime")
 def total_sales(first_date,second_date):
     try:
@@ -154,9 +154,6 @@ def total_sales(first_date,second_date):
     except Exception as e:
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
-
-
-
 
 
 @router.post("/products")
@@ -199,7 +196,8 @@ def update_product(product_id:int,new_price:float,new_quantity:int, admin_status
         print(f"Database Error: {e}")
 
         raise HTTPException(status_code=500,detail="خطای داخلی سرور در تغییر قیمت کالا")
-    
+
+
 @router.delete("/products/{product_id}")
 def delete_product(product_id, admin_status: str = Depends(verify_admin)):
     
@@ -221,6 +219,7 @@ def delete_product(product_id, admin_status: str = Depends(verify_admin)):
         raise HTTPException(status_code=500, detail="خطای داخلی سرور در پردازش حذف کالا")
     
 
+
 @router.put("/product/{product_id}/{sold_quantity}")
 def sold_product(product_id:int,sold_quantity:int):
     try:
@@ -236,5 +235,4 @@ def sold_product(product_id:int,sold_quantity:int):
         print(f"Database Error: {e}")
 
         raise HTTPException(status_code=500,detail="خطای داخلی سرور در تغییر قیمت کالا")
-    
 
