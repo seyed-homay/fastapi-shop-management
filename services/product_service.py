@@ -2,6 +2,7 @@ import sqlite3
 import sys
 import os
 from services import logs_services
+import datetime
 
 from db import get_db_connection
 
@@ -296,6 +297,33 @@ def get_total_sales_with_time(first_date:str,second_date:str):
         if total[0] == "null" or total[0] == None:
             return {"total_sales":0}
         return {"total_sales":total[0]}
+    except Exception as e:
+        print("ERROR : ",e)
+    finally:
+        conn.close()
+
+def get_profit_of_sales(time):
+    # print(time)
+    profit = 0
+    sum_profit=0
+    conn = get_db_connection()
+    try:
+        
+        cursor = conn.cursor()
+        sales_rows = cursor.execute("""SELECT * FROM sales WHERE DATE(timestamp)  = ?""",(time,))
+        rows=sales_rows.fetchall()
+        if rows == []:
+            return {"error":"nothing in database for this time"}
+        for row in rows:
+            
+            profit = row["total_price"] - (row["purchase_price"]*row["quantity"] )
+            sum_profit += profit
+
+        return sum_profit
+            
+
+
+
     except Exception as e:
         print("ERROR : ",e)
     finally:

@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from services import product_service
 from typing import List
 import jwt
+import datetime
+
 class ProductCreate(BaseModel):
     name: str
     price: float
@@ -154,6 +156,18 @@ def total_sales(first_date,second_date):
     except Exception as e:
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
+@router.get("/admin/analytics/total-profit")
+def total_profit(time =None):
+    if time is None:
+        time = (datetime.datetime.now().date())
+    try:
+        total = product_service.get_profit_of_sales(time)
+        return {"total":total,"detail":"سود روز شما :"}
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as e:
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
 
 
 @router.post("/products")
@@ -235,4 +249,5 @@ def sold_product(product_id:int,sold_quantity:int):
         print(f"Database Error: {e}")
 
         raise HTTPException(status_code=500,detail="خطای داخلی سرور در تغییر قیمت کالا")
+
 

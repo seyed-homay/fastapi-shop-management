@@ -87,7 +87,7 @@ def init_db():
                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                        FOREIGN KEY (product_id) REFERENCES products(id)
 )""")
-        cursor.execute("ALTER TABLE sales ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
+        # cursor.execute("ALTER TABLE sales ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
         
         conn.commit()
 

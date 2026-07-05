@@ -39,6 +39,7 @@ def product_logs(action,product_id,old_quantity,new_quantity,old_price,new_price
 
 def add_product(action,product_id):
     conn = get_db_connection()
+    
     try:
         cursor = conn.cursor()
         cursor.execute("""INSERT INTO inventory_logs(action,product_id,old_quantity
@@ -52,6 +53,7 @@ def add_product(action,product_id):
         return False
     finally:
         conn.close()
+
 def sell_product_log(action,product_id,old_quantity,new_quantity,buy_quantity,unit_price,total_price,purchase_price):
     conn = get_db_connection()
     try:
