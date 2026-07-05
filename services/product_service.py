@@ -2,12 +2,13 @@ import sqlite3
 import sys
 import os
 from services import logs_services
+import datetime
 
 from db import get_db_connection
 
 
 
-def add_product(name,price,quantity,category_id):
+def add_product(name,price,quantity,category_id,purchase_price):
 
     if price < 0 or quantity < 0 :
 
@@ -19,9 +20,9 @@ def add_product(name,price,quantity,category_id):
 
         cursor = conn.cursor()
 
-        cursor.execute("INSERT INTO products(name, price, quantity, category_id) VALUES (?,?,?,?)"
+        cursor.execute("INSERT INTO products(name, price, quantity, category_id,purchase_price) VALUES (?,?,?,?,?)"
                        
-                       ,(name,price,quantity,category_id))
+                       ,(name,price,quantity,category_id,purchase_price))
         product_id =cursor.lastrowid
         conn.commit()
         logs_services.add_product("add_product",product_id)
@@ -88,7 +89,7 @@ def add_multiple_products(products):
             else:
                 formatted_products.append(p)
 
-        cursor.executemany("INSERT INTO products(name,price,quantity,category_id) VALUES (?,?,?,?)",products)
+        cursor.executemany("INSERT INTO products(name,price,quantity,category_id,purchase_price) VALUES (?,?,?,?,?)",products)
 
         print("Insert into product is succesfull")
 
@@ -101,6 +102,7 @@ def add_multiple_products(products):
         print("Failed to insert products due to integrity error:", e)
         
         return False
+    
     except Exception as e:
         print("Unexpected error:", e)
         return False
@@ -260,28 +262,70 @@ def sell_product(product_id,buy_quantity):
         price = price_row.fetchone()[0]
         total_price = buy_quantity * price
         cursor.execute(query,(new_quantity,product_id))
-        
-
+        purchase_price = cursor.execute("SELECT purchase_price FROM products WHERE id =?",(product_id,))
+        purchase=purchase_price.fetchone()[0]
         conn.commit()
         print("product successfully was sold ")
-        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price)
+        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price,purchase)
         return True
 
     except Exception as e:
         print("ERROR : ",e)
     finally:
         conn.close()
-def get_total_sales():
+def get_today_total_sales():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         
-        total_prices = cursor.execute("""SELECT SUM(total_price) FROM sales WHERE DAtE(timestamp) = DATE(current_timestamp)""")
-        total = total_prices.fetchone()
-        if total == None or total == "null":
-            return {"total_sales" : 0}
+        today_total_prices = cursor.execute("""SELECT SUM(total_price) FROM sales WHERE DAtE(timestamp) = DATE(current_timestamp)""")
+        today_total = today_total_prices.fetchone()[0]
+        if today_total == None or today_total == "null":
+            return {"total_sales" : 0} 
+        return {"total_sales":today_total[0]}
+    except Exception as e:
+        print("ERROR : ",e)
+    finally:
+        conn.close()
+def get_total_sales_with_time(first_date:str,second_date:str):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        total_price = cursor.execute("""SELECT SUM(total_price) FROM sales WHERE DAtE(timestamp) BETWEEN ? AND ?""",
+                                     (first_date,second_date))
+        total = total_price.fetchone()
+        if total[0] == "null" or total[0] == None:
+            return {"total_sales":0}
         return {"total_sales":total[0]}
     except Exception as e:
         print("ERROR : ",e)
     finally:
         conn.close()
+
+def get_profit_of_sales(time):
+    # print(time)
+    profit = 0
+    sum_profit=0
+    conn = get_db_connection()
+    try:
+        
+        cursor = conn.cursor()
+        sales_rows = cursor.execute("""SELECT * FROM sales WHERE DATE(timestamp)  = ?""",(time,))
+        rows=sales_rows.fetchall()
+        if rows == []:
+            return {"error":"nothing in database for this time"}
+        for row in rows:
+            
+            profit = row["total_price"] - (row["purchase_price"]*row["quantity"] )
+            sum_profit += profit
+
+        return sum_profit
+            
+
+
+
+    except Exception as e:
+        print("ERROR : ",e)
+    finally:
+        conn.close()
+        

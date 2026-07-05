@@ -40,10 +40,12 @@ def init_db():
         
         cursor.execute("""CREATE TABLE IF NOT EXISTS  products(id INTEGER PRIMARY KEY AUTOINCREMENT,
                             name TEXT UNIQUE NOT NULL,
+                            purchase_price REAL NOT NULL DEFAULT 0,
                             price REAL NOT NULL,
                             quantity INTEGER NOT NULL,
                             category_id INTEGER ,
                             FOREIGN KEY (category_id) REFERENCES  categories(category_id))""")
+        # cursor.execute("ALTER TABLE products ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
         
         # cursor.execute("""ALTER TABLE products ADD COLUMN is_deleted INTEGER DEFAULT 0""")
 
@@ -85,6 +87,7 @@ def init_db():
                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                        FOREIGN KEY (product_id) REFERENCES products(id)
 )""")
+        # cursor.execute("ALTER TABLE sales ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
         
         conn.commit()
 

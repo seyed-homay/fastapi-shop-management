@@ -3,11 +3,14 @@ from pydantic import BaseModel
 from services import product_service
 from typing import List
 import jwt
+import datetime
+
 class ProductCreate(BaseModel):
     name: str
     price: float
     quantity: int
     category_id: int # اختیاری
+    purchase_price: float
     
 
 class InvoiceItem(BaseModel):
@@ -60,6 +63,8 @@ def get_product(product_id: int):
         
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")
+    
+
 @router.post("/product/invoice/sell")
 def sell_invoice(cart: List[InvoiceItem]):
 
@@ -81,9 +86,6 @@ def sell_invoice(cart: List[InvoiceItem]):
         print(f"Database Error: {e}")
 
         raise HTTPException(status_code=500,detail="خطای داخلی سرور در اضافه کردن ایتم به فاکتور")
-
-
-    
 
 
 @router.get("/products")
@@ -116,7 +118,6 @@ def get_all_products():
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")
 
-
 @router.get("/product/search")
 def search_product(keyword):
     try:
@@ -131,11 +132,11 @@ def search_product(keyword):
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
     
-@router.get("/admin/analytics/total-sales")
-def total_sales():
+@router.get("/admin/analytics/today-total-sales")
+def today_total_sales():
     try:
-        total = product_service.get_total_sales()
-
+        total = product_service.get_today_total_sales()
+        
         return total
     except HTTPException as http_err:
         raise http_err
@@ -144,7 +145,29 @@ def total_sales():
         raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
 
 
-
+@router.get("/admin/analytics/total-sales-withtime")
+def total_sales(first_date,second_date):
+    try:
+        total = product_service.get_total_sales_with_time(first_date,second_date)
+        
+        return total
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as e:
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
+@router.get("/admin/analytics/total-profit")
+def total_profit(time =None):
+    if time is None:
+        time = (datetime.datetime.now().date())
+    try:
+        total = product_service.get_profit_of_sales(time)
+        return {"total":total,"detail":"سود روز شما :"}
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as e:
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=500,detail="خطای داخلی در اتصال به سرور")
 
 
 @router.post("/products")
@@ -187,7 +210,8 @@ def update_product(product_id:int,new_price:float,new_quantity:int, admin_status
         print(f"Database Error: {e}")
 
         raise HTTPException(status_code=500,detail="خطای داخلی سرور در تغییر قیمت کالا")
-    
+
+
 @router.delete("/products/{product_id}")
 def delete_product(product_id, admin_status: str = Depends(verify_admin)):
     
@@ -209,6 +233,7 @@ def delete_product(product_id, admin_status: str = Depends(verify_admin)):
         raise HTTPException(status_code=500, detail="خطای داخلی سرور در پردازش حذف کالا")
     
 
+
 @router.put("/product/{product_id}/{sold_quantity}")
 def sold_product(product_id:int,sold_quantity:int):
     try:
@@ -224,5 +249,5 @@ def sold_product(product_id:int,sold_quantity:int):
         print(f"Database Error: {e}")
 
         raise HTTPException(status_code=500,detail="خطای داخلی سرور در تغییر قیمت کالا")
-    
+
 
