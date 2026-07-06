@@ -313,7 +313,7 @@ def get_profit_of_sales(time):
         sales_rows = cursor.execute("""SELECT * FROM sales WHERE DATE(timestamp)  = ?""",(time,))
         rows=sales_rows.fetchall()
         if rows == []:
-            return {"error":"nothing in database for this time"}
+            return 0
         for row in rows:
             
             profit = row["total_price"] - (row["purchase_price"]*row["quantity"] )
