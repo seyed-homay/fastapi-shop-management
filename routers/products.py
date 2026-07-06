@@ -11,6 +11,7 @@ class ProductCreate(BaseModel):
     quantity: int
     category_id: int # اختیاری
     purchase_price: float
+    min_stock : int = 5
     
 
 class InvoiceItem(BaseModel):
@@ -240,14 +241,14 @@ def sold_product(product_id:int,sold_quantity:int):
         solded_product = product_service.sell_product(product_id,sold_quantity)
 
         if solded_product:
-            return {"status": "success", "message": "قیمت و موجودی کالا با موفقیت تغییر یافت"}
+            return {"status": "success", "message": "کالا با موفقیت فروش رفت"},solded_product
         else:
-            raise HTTPException(status_code=400, detail="تغییر قیمت و موجودی کالا شکست خورد")
+            raise HTTPException(status_code=400, detail="فروش کالا با شکست مواجه شد")
     except HTTPException as http_err:
         raise http_err
     except Exception as e:
         print(f"Database Error: {e}")
 
-        raise HTTPException(status_code=500,detail="خطای داخلی سرور در تغییر قیمت کالا")
+        raise HTTPException(status_code=500,detail="خطای داخلی سرور در فروش کالا")
 
 
