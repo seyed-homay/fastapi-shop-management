@@ -76,7 +76,19 @@
         // آرایه برای نگهداری آیتم‌های فاکتور جاری
         let invoiceItems = [];
         let currentUser = { role: "user" };
-        let token ="";
+        let authToken = localStorage.getItem("auth_token") || "";
+
+        function initializeAuth() {
+            const savedRole = localStorage.getItem("user_role");
+            if (authToken) {
+                currentUser.role = savedRole || "user";
+                document.getElementById("login-section").style.display = "none";
+            } else {
+                document.getElementById("login-section").style.display = "block";
+            }
+            loadProducts();
+        }
+
         async function loadProducts() {
             const response = await fetch("/products")
             const data = await response.json();
@@ -223,7 +235,7 @@
             const category = document.getElementById("p_cat").value;
             const purchase = document.getElementById("b_price").value;
 
-            const response = await fetch(`/products?token=${my_token}`, {
+            const response = await fetch(`/products?token=${authToken}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -246,7 +258,7 @@
 
         async function deleteProduct(product_id){
             if (confirm("آیا از حذف کالا مطمئن هستید؟")){
-                const response = await fetch(`/products/${product_id}?token=${my_token}`,{method : "DELETE"})
+                const response = await fetch(`/products/${product_id}?token=${authToken}`,{method : "DELETE"})
                 if (response.ok){
                     location.reload();
                 } else {
@@ -263,7 +275,7 @@
             const newPrice = prompt("قیمت جدید کالا را وارد کنید:");
             if (newPrice === null || newPrice.trim() === "") return;
         
-            const response = await fetch(`/product/${product_id}/${parseFloat(newPrice)}/${parseInt(newQuantity)}?token=${my_token}`, {
+            const response = await fetch(`/product/${product_id}/${parseFloat(newPrice)}/${parseInt(newQuantity)}?token=${authToken}`, {
                 method: "PUT"
             });
         
@@ -378,10 +390,11 @@ async function loginUser() {
 
     if (response.ok) {
         const data = await response.json();
-        my_token = data.token;
+        authToken = data.token;
+        localStorage.setItem("auth_token", authToken);
+        localStorage.setItem("user_role", data.role);
         
         alert(`${data.message} \nنقش شما: ${data.role}`);
-        // فرم لاگین را مخفی می‌کنه چون کاربر وارد شده
         document.getElementById("login-section").style.display = "none";
         currentUser.role = data.role;
         loadProducts();
@@ -392,7 +405,7 @@ async function loginUser() {
     }
 }
 
-        window.onload = loadProducts;
+        window.onload = initializeAuth;
     </script>
 </body>
 </html>

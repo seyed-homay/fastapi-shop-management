@@ -8,7 +8,7 @@ from db import get_db_connection
 
 
 
-def add_product(name,price,quantity,category_id,purchase_price):
+def add_product(name,price,quantity,category_id,purchase_price,min_stock):
 
     if price < 0 or quantity < 0 :
 
@@ -20,9 +20,9 @@ def add_product(name,price,quantity,category_id,purchase_price):
 
         cursor = conn.cursor()
 
-        cursor.execute("INSERT INTO products(name, price, quantity, category_id,purchase_price) VALUES (?,?,?,?,?)"
+        cursor.execute("INSERT INTO products(name, price, quantity, category_id,purchase_price,min_stock) VALUES (?,?,?,?,?,?)"
                        
-                       ,(name,price,quantity,category_id,purchase_price))
+                       ,(name,price,quantity,category_id,purchase_price,min_stock))
         product_id =cursor.lastrowid
         conn.commit()
         logs_services.add_product("add_product",product_id)
@@ -69,6 +69,27 @@ def get_all_product():
         
     except Exception as e:
         print("ERROR",e)
+    finally:
+        conn.close()
+def get_minstocks_items():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT * FROM products WHERE quantity <= min_stock AND quantity != 0").fetchall()
+        return rows if rows else []
+    except Exception as e:
+        return "error",e
+    finally:
+        conn.close()
+
+def get_zerostocks_items():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT * FROM products WHERE quantity = 0").fetchall()
+        return rows if rows else []
+    except Exception as e:
+        return e
     finally:
         conn.close()
 
@@ -246,27 +267,39 @@ def get_category_total_value():
                
 def sell_product(product_id,buy_quantity):
     conn = get_db_connection()
+    alert = None
     try:
         cursor = conn.cursor()
-        old_quantity = cursor.execute("""SELECT quantity FROM products WHERE id = ?"""
-                                      ,(product_id,)).fetchone()[0]
+        product_row = cursor.execute("""SELECT name,quantity,price,purchase_price,min_stock FROM products
+                                     WHERE id = ?""",(product_id,)).fetchone()
+        old_quantity = product_row['quantity']
+        name = product_row['name']
+        min_stock = product_row['min_stock']
+        price = product_row['price']
+        purchase_price = product_row['purchase_price']
         if old_quantity<=0 :
             raise ValueError("این کالا در انبار موجود نیست")
         elif buy_quantity > old_quantity:
             raise ValueError("تعداد موجودی کمتر از درخواست شماست")
+        # old_quantity = cursor.execute("""SELECT quantity FROM products WHERE id = ?"""
+        #                               ,(product_id,)).fetchone()[0]
         # price = cursor.execute("""SELECT price FROM products WHERE id = ?"""
         #                                ,(product_id,)).fetchone()[0]
+        # min_stock = cursor.execute("SELECT min_stock FROM products WHERE id = ?",(product_id,)).fetchone()[0]
+        # name = cursor.execute("SELECT name FROM products WHERE id = ?",(product_id,)).fetchone()[0]
+        # price_row = cursor.execute("SELECT price FROM products WHERE id = ?",(product_id,))
+        # price = price_row.fetchone()[0]
+        # purchase_price = cursor.execute("SELECT purchase_price FROM products WHERE id =?",(product_id,))
+        # purchase=purchase_price.fetchone()[0]
         query = "UPDATE products SET quantity =? WHERE id = ?"
         new_quantity = old_quantity - buy_quantity
-        price_row = cursor.execute("SELECT price FROM products WHERE id = ?",(product_id,))
-        price = price_row.fetchone()[0]
+        if new_quantity <=min_stock:
+            alert = f"this porduct {name} quantity is lower than {min_stock}"
         total_price = buy_quantity * price
         cursor.execute(query,(new_quantity,product_id))
-        purchase_price = cursor.execute("SELECT purchase_price FROM products WHERE id =?",(product_id,))
-        purchase=purchase_price.fetchone()[0]
         conn.commit()
         print("product successfully was sold ")
-        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price,purchase)
+        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price,purchase_price)
         return True
 
     except Exception as e:
@@ -313,16 +346,13 @@ def get_profit_of_sales(time):
         sales_rows = cursor.execute("""SELECT * FROM sales WHERE DATE(timestamp)  = ?""",(time,))
         rows=sales_rows.fetchall()
         if rows == []:
-            return {"error":"nothing in database for this time"}
+            return 0
         for row in rows:
             
             profit = row["total_price"] - (row["purchase_price"]*row["quantity"] )
             sum_profit += profit
 
         return sum_profit
-            
-
-
 
     except Exception as e:
         print("ERROR : ",e)

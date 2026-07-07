@@ -43,8 +43,10 @@ def init_db():
                             purchase_price REAL NOT NULL DEFAULT 0,
                             price REAL NOT NULL,
                             quantity INTEGER NOT NULL,
+                            min_stock INTEGER NOT NULL,
                             category_id INTEGER ,
                             FOREIGN KEY (category_id) REFERENCES  categories(category_id))""")
+        # cursor.execute("ALTER TABLE products ADD COLUMN min_stock int NOT NULL DEFAULT 0")
         # cursor.execute("ALTER TABLE products ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
         
         # cursor.execute("""ALTER TABLE products ADD COLUMN is_deleted INTEGER DEFAULT 0""")
