@@ -35,35 +35,6 @@ router = APIRouter()
 #     return {'status':'success','message':'به سیستم انبار داری مغازهییی خود آمدید'}
 
 
-@router.get("/products/{product_id}")
-
-def get_product(product_id: int):
-    try:
-       
-        product = product_service.get_product_by_id(product_id)
-
-        
-        if not product:
-            raise HTTPException(status_code=404, detail="کالای مورد نظر یافت نشد")
-        
-        
-        return {
-            "id": product["id"],
-            "name": product["name"],
-            "price": product["price"],
-            # "quantity": product["quantity"],
-            # "category_id": product["category_id"],
-            # "is_deleted": product["is_deleted"]
-
-        }
-
-    except HTTPException as http_err:
-        
-        raise http_err
-    except Exception as e:
-        
-        print(f"Database Error: {e}")
-        raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")
     
 
 @router.post("/product/invoice/sell")
@@ -119,6 +90,32 @@ def get_all_products():
         print(f"Database Error: {e}")
         raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")
 
+@router.get("/products/admin/analytics/low-stock")
+def get_minstocks():
+    try:
+        minstock_items = product_service.get_minstocks_items()
+        return minstock_items
+
+    except HTTPException as http_err:
+        
+        raise http_err
+    except Exception as e:
+        
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")
+
+@router.get("/products/admin/analytics/zero-stock")
+def get_zerostck():
+    try:
+        zerostock_items = product_service.get_zerostocks_items()
+        return zerostock_items
+    except HTTPException as http_err:
+        
+        raise http_err
+    except Exception as e:
+        
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")  
 @router.get("/product/search")
 def search_product(keyword):
     try:
@@ -252,3 +249,32 @@ def sold_product(product_id:int,sold_quantity:int):
         raise HTTPException(status_code=500,detail="خطای داخلی سرور در فروش کالا")
 
 
+@router.get("/products/{product_id}")
+
+def get_product(product_id: int):
+    try:
+       
+        product = product_service.get_product_by_id(product_id)
+
+        
+        if not product:
+            raise HTTPException(status_code=404, detail="کالای مورد نظر یافت نشد")
+        
+        
+        return {
+            "id": product["id"],
+            "name": product["name"],
+            "price": product["price"],
+            # "quantity": product["quantity"],
+            # "category_id": product["category_id"],
+            # "is_deleted": product["is_deleted"]
+
+        }
+
+    except HTTPException as http_err:
+        
+        raise http_err
+    except Exception as e:
+        
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=500, detail="خطای داخلی سرور در اتصال به دیتابیس")

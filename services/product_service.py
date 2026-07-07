@@ -71,6 +71,27 @@ def get_all_product():
         print("ERROR",e)
     finally:
         conn.close()
+def get_minstocks_items():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT * FROM products WHERE quantity <= min_stock AND quantity != 0").fetchall()
+        return rows if rows else []
+    except Exception as e:
+        return "error",e
+    finally:
+        conn.close()
+
+def get_zerostocks_items():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT * FROM products WHERE quantity = 0").fetchall()
+        return rows if rows else []
+    except Exception as e:
+        return e
+    finally:
+        conn.close()
 
 def add_multiple_products(products):
     conn = get_db_connection()
