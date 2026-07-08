@@ -21,6 +21,16 @@
         .auth-card p { margin: 0; }
         input, select { padding: 8px; width: 160px; margin-left: 10px; }
         button { padding: 8px 15px; background-color: #28a745; color: white; border: none; cursor: pointer; }
+        .notifications { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .stock-button-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .stock-button { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
+        .stock-button.low { background-color: #ffc107; color: #333; }
+        .stock-button.zero { background-color: #dc3545; }
+        .notification-card { padding: 12px 14px; border-radius: 8px; background: #fff; border: 1px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        .notification-card.low-stock { border-color: #ffc107; background: #fff8e1; }
+        .notification-card.zero-stock { border-color: #dc3545; background: #ffe9e9; }
+        .notification-card h4 { margin: 0 0 8px; font-size: 1rem; }
+        .notification-card p { margin: 0; color: #555; }
         .table-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid #ccc; margin-top: 20px; margin-bottom: 20px; }
     </style>
 </head>
@@ -28,6 +38,11 @@
     <div class="container">
         <h2>سیستم انبارداری مغازه</h2>
         <div id="auth-status" style="margin-bottom: 15px;"></div>
+        <div class="stock-button-row">
+            <button class="stock-button low" onclick="showLowStockItems()">نمایش کالاهای نزدیک حداقل</button>
+            <button class="stock-button zero" onclick="showZeroStockItems()">نمایش کالاهای موجودی صفر</button>
+        </div>
+        <div id="notifications" class="notifications"></div>
         <div id="login-section" class="auth-forms" style="margin-bottom: 20px;">
             <div class="auth-card auth-login-card">
                 <h3>🔑 ورود به سیستم</h3>
@@ -201,6 +216,77 @@
                 </tr>
                 `;
             });
+        }
+
+        let currentStockView = null;
+
+        async function showLowStockItems() {
+            if (currentStockView === "low") {
+                clearStockItems();
+                return;
+            }
+            currentStockView = "low";
+            await loadStockItems("low");
+        }
+
+        async function showZeroStockItems() {
+            if (currentStockView === "zero") {
+                clearStockItems();
+                return;
+            }
+            currentStockView = "zero";
+            await loadStockItems("zero");
+        }
+
+        async function loadStockItems(type) {
+            const endpoint = type === "low" ? "/products/admin/analytics/low-stock" : "/products/admin/analytics/zero-stock";
+            const response = await fetch(endpoint);
+            const container = document.getElementById("notifications");
+            if (!container) return;
+
+            if (!response.ok) {
+                container.innerHTML = `<div class="notification-card" style="border-color:#dc3545;background:#ffe9e9;">
+                    <h4>خطا در دریافت اطلاعات</h4>
+                    <p>لطفا دوباره تلاش کنید.</p>
+                </div>`;
+                return;
+            }
+
+            const items = await response.json();
+            renderStockResults(items, type, container);
+        }
+
+        function clearStockItems() {
+            const container = document.getElementById("notifications");
+            if (!container) return;
+            currentStockView = null;
+            container.innerHTML = "";
+        }
+
+        function renderStockResults(items, type, container) {
+            if (!container) return;
+            if (!Array.isArray(items) || items.length === 0) {
+                container.innerHTML = `<div class="notification-card" style="border-color:#6c757d;background:#f8f9fa;">
+                    <h4>هیچ آیتمی برای نمایش وجود ندارد</h4>
+                    <p>در حال حاضر موردی برای این دسته وجود ندارد.</p>
+                </div>`;
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const title = type === "low"
+                    ? `کالای ${item.name} نزدیک حداقل موجودی است`
+                    : `کالای ${item.name} موجودی صفر دارد`;
+                const message = type === "low"
+                    ? `موجودی فعلی: ${item.quantity}، حداقل مجاز: ${item.min_stock}`
+                    : `آی‌دی کالا: ${item.id}`;
+                return `
+                    <div class="notification-card ${type === "low" ? "low-stock" : "zero-stock"}">
+                        <h4>${title}</h4>
+                        <p>${message}</p>
+                    </div>
+                `;
+            }).join("");
         }
 
         // تابع مدیریت فاکتور: افزودن کالا به لیست فاکتور
