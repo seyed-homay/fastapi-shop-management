@@ -18,6 +18,7 @@
 <body>
     <div class="container">
         <h2>سیستم انبارداری مغازه</h2>
+        <div id="auth-status" style="margin-bottom: 15px;"></div>
         <div id="login-section" style="border: 2px solid #007bff; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fff; max-width: 400px;">
         <h3>🔑 ورود به سیستم</h3>
         <div class="form-group">
@@ -76,17 +77,80 @@
         // آرایه برای نگهداری آیتم‌های فاکتور جاری
         let invoiceItems = [];
         let currentUser = { role: "user" };
-        let authToken = localStorage.getItem("auth_token") || "";
+        let authToken = "";
+        const authExpiryMs = 1000 * 60 * 60 * 4; // مدت زمان اعتبار توکن در فرانت: 4 ساعت
+
+        function saveAuth(token, role, username) {
+            authToken = token;
+            currentUser.role = role || "user";
+            const expiresAt = Date.now() + authExpiryMs;
+            localStorage.setItem("auth_token", authToken);
+            localStorage.setItem("user_role", currentUser.role);
+            localStorage.setItem("user_name", username || "مهمان");
+            localStorage.setItem("auth_expires_at", expiresAt.toString());
+            updateAuthUI();
+        }
+
+        function loadAuth() {
+            const token = localStorage.getItem("auth_token");
+            const role = localStorage.getItem("user_role");
+            const expiresAt = Number(localStorage.getItem("auth_expires_at") || "0");
+            if (!token || !role || Date.now() > expiresAt) {
+                clearAuth();
+                return false;
+            }
+            authToken = token;
+            currentUser.role = role;
+            updateAuthUI();
+            return true;
+        }
+
+        function clearAuth() {
+            authToken = "";
+            currentUser.role = "user";
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("user_role");
+            localStorage.removeItem("user_name");
+            localStorage.removeItem("auth_expires_at");
+            updateAuthUI();
+            document.getElementById("login-section").style.display = "block";
+        }
+
+        function updateAuthUI() {
+            const authStatus = document.getElementById("auth-status");
+            const storedName = localStorage.getItem("user_name") || "مهمان";
+            if (authToken) {
+                authStatus.innerHTML = `
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="width:34px; height:34px; border-radius:50%; background:#007bff; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">
+                                ${storedName[0] || "U"}
+                            </span>
+                            <div style="text-align:right; line-height:1.2;">
+                                <div style="font-weight:bold;">${storedName}</div>
+                                <div style="color:#555; font-size:0.95em;">${currentUser.role === "admin" ? "ادمین" : "کاربر"}</div>
+                            </div>
+                        </div>
+                        <button onclick="logout()" style="padding:8px 14px; background:#dc3545; color:white; border:none; border-radius:6px; cursor:pointer;">خروج</button>
+                    </div>`;
+            } else {
+                authStatus.innerHTML = "";
+            }
+        }
 
         function initializeAuth() {
-            const savedRole = localStorage.getItem("user_role");
-            if (authToken) {
-                currentUser.role = savedRole || "user";
+            const isValid = loadAuth();
+            if (isValid) {
                 document.getElementById("login-section").style.display = "none";
             } else {
                 document.getElementById("login-section").style.display = "block";
             }
             loadProducts();
+        }
+
+        function logout() {
+            clearAuth();
+            location.reload();
         }
 
         async function loadProducts() {
@@ -286,49 +350,6 @@
                 alert(errorData.detail || "خطا در ویرایش کالا!");
             }
         }
-        async function searchProducts() {
-    const keyword = document.getElementById("search_input").value;
-    
-    // اگر کادر سرچ خالی شد، دوباره کل محصولات انبار رو لود کن
-    if (keyword.trim() === "") {
-        loadProducts();
-        return;
-    }
-    
-    // درخواست به روت پایتونی که خودت ساختی
-    const response = await fetch(`/product/search?keyword=${encodeURIComponent(keyword)}`);
-    
-        if (response.ok) {
-            const data = await response.json();
-            const tableBody = document.getElementById("products_table");
-            tableBody.innerHTML = ""; // اول جدول قبلی رو پاک میکنیم
-
-            // حالا دیتای جدیدی که پایتون فیلتر کرده رو توی جدول رندر میکنیم
-            data.forEach(product => {
-                tableBody.innerHTML += `
-                <tr>
-                    <td>${product.id}</td>
-                    <td>${product.name}</td>
-                    <td>${product.price.toLocaleString()}</td>
-                    <td>${product.quantity}</td>
-                    <td>
-                        <button onclick="editQuantity(${product.id}, ${product.quantity})" 
-                        style="background-color: #28a745; color: white; padding: 5px 10px; border: none; 
-                        border-radius: 4px; cursor: pointer; margin-left: 5px;">ویرایش</button>
-
-                        <button onclick="addToInvoice(${product.id}, '${product.name}', ${product.price}, ${product.quantity})" 
-                        style="background-color: #007bff; color: white; padding: 5px 10px; border: none;
-                        border-radius: 4px; cursor: pointer; margin-left: 5px;">+ افزودن به فاکتور</button>
-
-                        <button onclick="deleteProduct(${product.id})" 
-                        style="background-color: #dc3545; color: white; padding: 5px 10px; border: none; 
-                        border-radius: 4px; cursor: pointer;">حذف</button>
-                    </td>
-                </tr>
-                `;
-            });
-        }
-    }
 async function searchProducts() {
     const keyword = document.getElementById("search_input").value;
     
@@ -390,13 +411,10 @@ async function loginUser() {
 
     if (response.ok) {
         const data = await response.json();
-        authToken = data.token;
-        localStorage.setItem("auth_token", authToken);
-        localStorage.setItem("user_role", data.role);
+        saveAuth(data.token, data.role, username);
         
         alert(`${data.message} \nنقش شما: ${data.role}`);
         document.getElementById("login-section").style.display = "none";
-        currentUser.role = data.role;
         loadProducts();
 
     } else {
