@@ -4,12 +4,21 @@
     <meta charset="UTF-8">
     <title>مدیریت انبار مغازه</title>
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
         body { font-family: Tahoma, sans-serif; background-color: #f4f4f9; padding: 20px; }
         .container { max-width: 1100px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
         th { background-color: #007bff; color: white; position: sticky; top: 0; } /* هدر جدول با اسکرول بالا می‌ماند */
         .form-group { margin-bottom: 15px; }
+        .auth-forms { display: flex; gap: 20px; justify-content: space-between; flex-wrap: wrap; }
+        .auth-card { width: calc(50% - 10px); min-width: 300px; border: 2px solid #007bff; padding: 15px; border-radius: 8px; background: #fff; }
+        .auth-card h3 { margin-top: 0; }
+        .auth-login-fields,
+        .auth-register-fields { display: flex; flex-direction: column; gap: 10px; }
+        .auth-card input { width: 100%; padding: 10px; }
+        .auth-card button { padding: 10px; }
+        .auth-card p { margin: 0; }
         input, select { padding: 8px; width: 160px; margin-left: 10px; }
         button { padding: 8px 15px; background-color: #28a745; color: white; border: none; cursor: pointer; }
         .table-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid #ccc; margin-top: 20px; margin-bottom: 20px; }
@@ -19,14 +28,25 @@
     <div class="container">
         <h2>سیستم انبارداری مغازه</h2>
         <div id="auth-status" style="margin-bottom: 15px;"></div>
-        <div id="login-section" style="border: 2px solid #007bff; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fff; max-width: 400px;">
-        <h3>🔑 ورود به سیستم</h3>
-        <div class="form-group">
-        <input type="text" id="login_username" placeholder="نام کاربری">
-        <input type="password" id="login_password" placeholder="رمز عبور">
-        <button onclick="loginUser()" style="background-color: #007bff;">ورود</button>
-    </div>
-</div>
+        <div id="login-section" class="auth-forms" style="margin-bottom: 20px;">
+            <div class="auth-card auth-login-card">
+                <h3>🔑 ورود به سیستم</h3>
+                <div class="auth-login-fields">
+                    <input type="text" id="login_username" placeholder="نام کاربری">
+                    <input type="password" id="login_password" placeholder="رمز عبور">
+                    <button onclick="loginUser()" style="background-color: #007bff;">ورود</button>
+                </div>
+            </div>
+            <div class="auth-card auth-register-card">
+                <h3>🧾 ساخت اکانت جدید</h3>
+                <div class="auth-register-fields">
+                    <input type="text" id="register_username" placeholder="نام کاربری جدید">
+                    <input type="password" id="register_password" placeholder="رمز عبور جدید">
+                    <button onclick="registerUser()" style="background-color: #17a2b8;">ثبت نام</button>
+                </div>
+                <p style="color:#555; margin-top:10px; font-size:0.95em;">اگر حساب ندارید، با ساخت اکانت جدید ابتدا ثبت نام کنید و سپس وارد شوید.</p>
+            </div>
+        </div>
         <h3>ثبت کالای جدید</h3>
         <div class="form-group">
             <input type="text" id="p_name" placeholder="نام کالا">
@@ -420,6 +440,37 @@ async function loginUser() {
     } else {
         const errorData = await response.json();
         alert(errorData.detail || "خطا در ورود!");
+    }
+}
+
+async function registerUser() {
+    const username = document.getElementById("register_username").value.trim();
+    const password = document.getElementById("register_password").value.trim();
+
+    if (!username || !password) {
+        alert("لطفا نام کاربری و رمز عبور را وارد کنید.");
+        return;
+    }
+
+    const response = await fetch("/users", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password
+        })
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        alert(data.message || "اکانت با موفقیت ساخته شد. اکنون وارد شوید.");
+        document.getElementById("register_username").value = "";
+        document.getElementById("register_password").value = "";
+    } else {
+        const errorData = await response.json();
+        alert(errorData.detail || "خطا در ساخت اکانت!");
     }
 }
 
