@@ -23,7 +23,9 @@ def add_product(name,price,quantity,category_id,purchase_price,min_stock):
         cursor.execute("INSERT INTO products(name, price, quantity, category_id,purchase_price,min_stock) VALUES (?,?,?,?,?,?)"
                        
                        ,(name,price,quantity,category_id,purchase_price,min_stock))
+        #این دستور میاد ورودی ها لازم متناسب با جدول رو میگیره و وارد میکنی در جدول
         product_id =cursor.lastrowid
+        #این دستور میاد اخرین ردیف رو انتخاب میکنه که همون ردیفی که میشه ما وارد کردیم
         conn.commit()
         logs_services.add_product("add_product",product_id)
         return True
@@ -52,6 +54,7 @@ def get_product_by_id(product_id):
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM products  WHERE id = ? ",(product_id,))
         row = cursor.fetchone()
+        #آیتم مورد نظر رو پیدا میکنه و کل ردیف رو به صورت دیکشنری برمیگردونه
         return dict(row) if row else None
     
     except Exception as e:
@@ -64,8 +67,10 @@ def get_all_product():
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM products WHERE is_deleted = 0")
+        
         rows = cursor.fetchall()
         return rows if rows else []
+    
         
     except Exception as e:
         print("ERROR",e)
@@ -76,6 +81,7 @@ def get_minstocks_items():
     try:
         cursor = conn.cursor()
         rows = cursor.execute("SELECT * FROM products WHERE quantity <= min_stock AND quantity != 0").fetchall()
+        #اینجا فقط ردیف هایی که تعدادشون کمتر از حد هشدار هست رو رو برمیگردونیم به غیر از اونایی که مقدارشون صفر
         return rows if rows else []
     except Exception as e:
         return "error",e
@@ -87,6 +93,7 @@ def get_zerostocks_items():
     try:
         cursor = conn.cursor()
         rows = cursor.execute("SELECT * FROM products WHERE quantity = 0").fetchall()
+        #گرفتن ایتم هایی که موجودیشون صفر شده
         return rows if rows else []
     except Exception as e:
         return e
@@ -101,16 +108,19 @@ def add_multiple_products(products):
         formatted_products = []
         for p in products:
             if isinstance(p, dict):
+                #چک کردن اینکه ایا 
                 formatted_products.append((
                     p["name"],
                     p["price"],
                     p["quantity"],
-                    p["category_id"]
+                    p["category_id"],
+                    p["purchase_price"],
+                    p["min_stock"]
                 ))
             else:
                 formatted_products.append(p)
 
-        cursor.executemany("INSERT INTO products(name,price,quantity,category_id,purchase_price) VALUES (?,?,?,?,?)",products)
+        cursor.executemany("INSERT INTO products(name,price,quantity,category_id,purchase_price,min_stock) VALUES (?,?,?,?,?)",formatted_products)
 
         print("Insert into product is succesfull")
 
