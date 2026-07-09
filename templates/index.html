@@ -4,28 +4,64 @@
     <meta charset="UTF-8">
     <title>مدیریت انبار مغازه</title>
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
         body { font-family: Tahoma, sans-serif; background-color: #f4f4f9; padding: 20px; }
         .container { max-width: 1100px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
         th { background-color: #007bff; color: white; position: sticky; top: 0; } /* هدر جدول با اسکرول بالا می‌ماند */
         .form-group { margin-bottom: 15px; }
+        .auth-forms { display: flex; gap: 20px; justify-content: space-between; flex-wrap: wrap; }
+        .auth-card { width: calc(50% - 10px); min-width: 300px; border: 2px solid #007bff; padding: 15px; border-radius: 8px; background: #fff; }
+        .auth-card h3 { margin-top: 0; }
+        .auth-login-fields,
+        .auth-register-fields { display: flex; flex-direction: column; gap: 10px; }
+        .auth-card input { width: 100%; padding: 10px; }
+        .auth-card button { padding: 10px; }
+        .auth-card p { margin: 0; }
         input, select { padding: 8px; width: 160px; margin-left: 10px; }
         button { padding: 8px 15px; background-color: #28a745; color: white; border: none; cursor: pointer; }
+        .notifications { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .stock-button-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .stock-button { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
+        .stock-button.low { background-color: #ffc107; color: #333; }
+        .stock-button.zero { background-color: #dc3545; }
+        .notification-card { padding: 12px 14px; border-radius: 8px; background: #fff; border: 1px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        .notification-card.low-stock { border-color: #ffc107; background: #fff8e1; }
+        .notification-card.zero-stock { border-color: #dc3545; background: #ffe9e9; }
+        .notification-card h4 { margin: 0 0 8px; font-size: 1rem; }
+        .notification-card p { margin: 0; color: #555; }
         .table-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid #ccc; margin-top: 20px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>سیستم انبارداری مغازه</h2>
-        <div id="login-section" style="border: 2px solid #007bff; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fff; max-width: 400px;">
-        <h3>🔑 ورود به سیستم</h3>
-        <div class="form-group">
-        <input type="text" id="login_username" placeholder="نام کاربری">
-        <input type="password" id="login_password" placeholder="رمز عبور">
-        <button onclick="loginUser()" style="background-color: #007bff;">ورود</button>
-    </div>
-</div>
+        <div id="auth-status" style="margin-bottom: 15px;"></div>
+        <div class="stock-button-row">
+            <button class="stock-button low" onclick="showLowStockItems()">نمایش کالاهای نزدیک حداقل</button>
+            <button class="stock-button zero" onclick="showZeroStockItems()">نمایش کالاهای موجودی صفر</button>
+        </div>
+        <div id="notifications" class="notifications"></div>
+        <div id="login-section" class="auth-forms" style="margin-bottom: 20px;">
+            <div class="auth-card auth-login-card">
+                <h3>🔑 ورود به سیستم</h3>
+                <div class="auth-login-fields">
+                    <input type="text" id="login_username" placeholder="نام کاربری">
+                    <input type="password" id="login_password" placeholder="رمز عبور">
+                    <button onclick="loginUser()" style="background-color: #007bff;">ورود</button>
+                </div>
+            </div>
+            <div class="auth-card auth-register-card">
+                <h3>🧾 ساخت اکانت جدید</h3>
+                <div class="auth-register-fields">
+                    <input type="text" id="register_username" placeholder="نام کاربری جدید">
+                    <input type="password" id="register_password" placeholder="رمز عبور جدید">
+                    <button onclick="registerUser()" style="background-color: #17a2b8;">ثبت نام</button>
+                </div>
+                <p style="color:#555; margin-top:10px; font-size:0.95em;">اگر حساب ندارید، با ساخت اکانت جدید ابتدا ثبت نام کنید و سپس وارد شوید.</p>
+            </div>
+        </div>
         <h3>ثبت کالای جدید</h3>
         <div class="form-group">
             <input type="text" id="p_name" placeholder="نام کالا">
@@ -76,17 +112,80 @@
         // آرایه برای نگهداری آیتم‌های فاکتور جاری
         let invoiceItems = [];
         let currentUser = { role: "user" };
-        let authToken = localStorage.getItem("auth_token") || "";
+        let authToken = "";
+        const authExpiryMs = 1000 * 60 * 60 * 4; // مدت زمان اعتبار توکن در فرانت: 4 ساعت
+
+        function saveAuth(token, role, username) {
+            authToken = token;
+            currentUser.role = role || "user";
+            const expiresAt = Date.now() + authExpiryMs;
+            localStorage.setItem("auth_token", authToken);
+            localStorage.setItem("user_role", currentUser.role);
+            localStorage.setItem("user_name", username || "مهمان");
+            localStorage.setItem("auth_expires_at", expiresAt.toString());
+            updateAuthUI();
+        }
+
+        function loadAuth() {
+            const token = localStorage.getItem("auth_token");
+            const role = localStorage.getItem("user_role");
+            const expiresAt = Number(localStorage.getItem("auth_expires_at") || "0");
+            if (!token || !role || Date.now() > expiresAt) {
+                clearAuth();
+                return false;
+            }
+            authToken = token;
+            currentUser.role = role;
+            updateAuthUI();
+            return true;
+        }
+
+        function clearAuth() {
+            authToken = "";
+            currentUser.role = "user";
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("user_role");
+            localStorage.removeItem("user_name");
+            localStorage.removeItem("auth_expires_at");
+            updateAuthUI();
+            document.getElementById("login-section").style.display = "block";
+        }
+
+        function updateAuthUI() {
+            const authStatus = document.getElementById("auth-status");
+            const storedName = localStorage.getItem("user_name") || "مهمان";
+            if (authToken) {
+                authStatus.innerHTML = `
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="width:34px; height:34px; border-radius:50%; background:#007bff; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">
+                                ${storedName[0] || "U"}
+                            </span>
+                            <div style="text-align:right; line-height:1.2;">
+                                <div style="font-weight:bold;">${storedName}</div>
+                                <div style="color:#555; font-size:0.95em;">${currentUser.role === "admin" ? "ادمین" : "کاربر"}</div>
+                            </div>
+                        </div>
+                        <button onclick="logout()" style="padding:8px 14px; background:#dc3545; color:white; border:none; border-radius:6px; cursor:pointer;">خروج</button>
+                    </div>`;
+            } else {
+                authStatus.innerHTML = "";
+            }
+        }
 
         function initializeAuth() {
-            const savedRole = localStorage.getItem("user_role");
-            if (authToken) {
-                currentUser.role = savedRole || "user";
+            const isValid = loadAuth();
+            if (isValid) {
                 document.getElementById("login-section").style.display = "none";
             } else {
                 document.getElementById("login-section").style.display = "block";
             }
             loadProducts();
+        }
+
+        function logout() {
+            clearAuth();
+            location.reload();
         }
 
         async function loadProducts() {
@@ -117,6 +216,77 @@
                 </tr>
                 `;
             });
+        }
+
+        let currentStockView = null;
+
+        async function showLowStockItems() {
+            if (currentStockView === "low") {
+                clearStockItems();
+                return;
+            }
+            currentStockView = "low";
+            await loadStockItems("low");
+        }
+
+        async function showZeroStockItems() {
+            if (currentStockView === "zero") {
+                clearStockItems();
+                return;
+            }
+            currentStockView = "zero";
+            await loadStockItems("zero");
+        }
+
+        async function loadStockItems(type) {
+            const endpoint = type === "low" ? "/products/admin/analytics/low-stock" : "/products/admin/analytics/zero-stock";
+            const response = await fetch(endpoint);
+            const container = document.getElementById("notifications");
+            if (!container) return;
+
+            if (!response.ok) {
+                container.innerHTML = `<div class="notification-card" style="border-color:#dc3545;background:#ffe9e9;">
+                    <h4>خطا در دریافت اطلاعات</h4>
+                    <p>لطفا دوباره تلاش کنید.</p>
+                </div>`;
+                return;
+            }
+
+            const items = await response.json();
+            renderStockResults(items, type, container);
+        }
+
+        function clearStockItems() {
+            const container = document.getElementById("notifications");
+            if (!container) return;
+            currentStockView = null;
+            container.innerHTML = "";
+        }
+
+        function renderStockResults(items, type, container) {
+            if (!container) return;
+            if (!Array.isArray(items) || items.length === 0) {
+                container.innerHTML = `<div class="notification-card" style="border-color:#6c757d;background:#f8f9fa;">
+                    <h4>هیچ آیتمی برای نمایش وجود ندارد</h4>
+                    <p>در حال حاضر موردی برای این دسته وجود ندارد.</p>
+                </div>`;
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const title = type === "low"
+                    ? `کالای ${item.name} نزدیک حداقل موجودی است`
+                    : `کالای ${item.name} موجودی صفر دارد`;
+                const message = type === "low"
+                    ? `موجودی فعلی: ${item.quantity}، حداقل مجاز: ${item.min_stock}`
+                    : `آی‌دی کالا: ${item.id}`;
+                return `
+                    <div class="notification-card ${type === "low" ? "low-stock" : "zero-stock"}">
+                        <h4>${title}</h4>
+                        <p>${message}</p>
+                    </div>
+                `;
+            }).join("");
         }
 
         // تابع مدیریت فاکتور: افزودن کالا به لیست فاکتور
@@ -286,49 +456,6 @@
                 alert(errorData.detail || "خطا در ویرایش کالا!");
             }
         }
-        async function searchProducts() {
-    const keyword = document.getElementById("search_input").value;
-    
-    // اگر کادر سرچ خالی شد، دوباره کل محصولات انبار رو لود کن
-    if (keyword.trim() === "") {
-        loadProducts();
-        return;
-    }
-    
-    // درخواست به روت پایتونی که خودت ساختی
-    const response = await fetch(`/product/search?keyword=${encodeURIComponent(keyword)}`);
-    
-        if (response.ok) {
-            const data = await response.json();
-            const tableBody = document.getElementById("products_table");
-            tableBody.innerHTML = ""; // اول جدول قبلی رو پاک میکنیم
-
-            // حالا دیتای جدیدی که پایتون فیلتر کرده رو توی جدول رندر میکنیم
-            data.forEach(product => {
-                tableBody.innerHTML += `
-                <tr>
-                    <td>${product.id}</td>
-                    <td>${product.name}</td>
-                    <td>${product.price.toLocaleString()}</td>
-                    <td>${product.quantity}</td>
-                    <td>
-                        <button onclick="editQuantity(${product.id}, ${product.quantity})" 
-                        style="background-color: #28a745; color: white; padding: 5px 10px; border: none; 
-                        border-radius: 4px; cursor: pointer; margin-left: 5px;">ویرایش</button>
-
-                        <button onclick="addToInvoice(${product.id}, '${product.name}', ${product.price}, ${product.quantity})" 
-                        style="background-color: #007bff; color: white; padding: 5px 10px; border: none;
-                        border-radius: 4px; cursor: pointer; margin-left: 5px;">+ افزودن به فاکتور</button>
-
-                        <button onclick="deleteProduct(${product.id})" 
-                        style="background-color: #dc3545; color: white; padding: 5px 10px; border: none; 
-                        border-radius: 4px; cursor: pointer;">حذف</button>
-                    </td>
-                </tr>
-                `;
-            });
-        }
-    }
 async function searchProducts() {
     const keyword = document.getElementById("search_input").value;
     
@@ -390,18 +517,46 @@ async function loginUser() {
 
     if (response.ok) {
         const data = await response.json();
-        authToken = data.token;
-        localStorage.setItem("auth_token", authToken);
-        localStorage.setItem("user_role", data.role);
+        saveAuth(data.token, data.role, username);
         
         alert(`${data.message} \nنقش شما: ${data.role}`);
         document.getElementById("login-section").style.display = "none";
-        currentUser.role = data.role;
         loadProducts();
 
     } else {
         const errorData = await response.json();
         alert(errorData.detail || "خطا در ورود!");
+    }
+}
+
+async function registerUser() {
+    const username = document.getElementById("register_username").value.trim();
+    const password = document.getElementById("register_password").value.trim();
+
+    if (!username || !password) {
+        alert("لطفا نام کاربری و رمز عبور را وارد کنید.");
+        return;
+    }
+
+    const response = await fetch("/users", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password
+        })
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        alert(data.message || "اکانت با موفقیت ساخته شد. اکنون وارد شوید.");
+        document.getElementById("register_username").value = "";
+        document.getElementById("register_password").value = "";
+    } else {
+        const errorData = await response.json();
+        alert(errorData.detail || "خطا در ساخت اکانت!");
     }
 }
 
