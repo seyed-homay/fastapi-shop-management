@@ -144,7 +144,7 @@ def today_total_sales():
 
 
 @router.get("/admin/analytics/total-sales-withtime")
-def total_sales(first_date,second_date):
+def total_sales(first_date:str,second_date:str):
     try:
         total = product_service.get_total_sales_with_time(first_date,second_date)
         

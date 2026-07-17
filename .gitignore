@@ -8,3 +8,4 @@ logs/
 routers/__pycache__/
 services/__pycache__/
 __pycache__/
+sqlalchemy_test/
