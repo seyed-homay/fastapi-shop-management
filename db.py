@@ -1,14 +1,30 @@
 import sqlite3 
 import os
 import logging
-
+import sqlalchemy as db
+from db import ForeignKey ,func ,Integer , String , update
+from sqlalchemy.orm import DeclarativeBase ,Mapped ,mapped_column ,relationship ,sessionmaker 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "inventory.db")
 
+
+engine = db.create_engine("sqlite:///inventory.db",connect_args={"autocommit":False},echo=True)
+
+
 logging.basicConfig(filename="logs/db.log",level=logging.INFO)
 
 logging.info("order fetched succesfull")
+class Base(DeclarativeBase):
+    pass
+
+class users(Base):
+    __tablename__ = "users"
+    id : Mapped[int] = mapped_column(primary_key=True)
+    username : Mapped[str]  = mapped_column(unique=True)
+    password_hash : Mapped[str]
+    role : Mapped[str] = mapped_column(default="user")
+
 
 def get_db_connection():
 
@@ -90,7 +106,7 @@ def init_db():
                        FOREIGN KEY (product_id) REFERENCES products(id)
 )""")
         # cursor.execute("ALTER TABLE sales ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
-        
+        Base.metadata.create_all(engine)
         conn.commit()
 
         print("We Created Basic Tables successful")
