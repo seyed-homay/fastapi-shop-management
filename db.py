@@ -9,21 +9,44 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "inventory.db")
 
 
-engine = db.create_engine("sqlite:///inventory.db",connect_args={"autocommit":False},echo=True)
+engine = db.create_engine("sqlite:///inventory.db",connect_args={"check_same_thread": False},echo=True)
 
 
 logging.basicConfig(filename="logs/db.log",level=logging.INFO)
 
 logging.info("order fetched succesfull")
+
+
 class Base(DeclarativeBase):
     pass
 
 class users(Base):
     __tablename__ = "users"
     id : Mapped[int] = mapped_column(primary_key=True)
-    username : Mapped[str]  = mapped_column(unique=True)
-    password_hash : Mapped[str]
+    username : Mapped[str] = mapped_column(unique=True)
+    hashed_password : Mapped[str] 
     role : Mapped[str] = mapped_column(default="user")
+    
+class categories(Base):
+    __tablename__ = "categories"
+    category_id : Mapped[int] = mapped_column(primary_key=True)
+    name : Mapped[str] = mapped_column(unique=True)
+class products(Base):
+    __tablename__ = "products"
+    id : Mapped[int]= mapped_column(primary_key=True)
+    name : Mapped[str] = mapped_column(unique=True)
+    purchase_price : Mapped[float]
+    price : Mapped[float]
+    quantity : Mapped[int]
+    min_stock : Mapped[int] = mapped_column(default=5)
+    category_id: Mapped[int] = mapped_column(db.ForeignKey("categories.category_id"))
+class logs(Base):
+    __tablename__ = "logs"
+    id : Mapped[int] = mapped_column(primary_key=True)
+    action : Mapped[str]
+    user_id : Mapped[int] = mapped_column(db.ForeignKey("users.id"))
+    timestamp : Mapped[str] = mapped_column(server_default=db.func.current_timestamp())
+    #این قسمت جدیده و در فایل قبلی نوشتن زمان رو با پایتون انجام میدادیم ولی اینجا با خوده دیتابیس
 
 
 def get_db_connection():
@@ -45,7 +68,7 @@ def init_db():
 
     try:
         cursor = conn.cursor()
-
+        
         cursor.execute("""CREATE TABLE IF NOT EXISTS  users(id INTEGER PRIMARY KEY AUTOINCREMENT,
                             username TEXT UNIQUE NOT NULL,
                             password_hash TEXT NOT NULL,
