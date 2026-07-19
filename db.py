@@ -1,67 +1,136 @@
 import sqlite3 
 import os
 import logging
-import sqlalchemy as db
-from db import ForeignKey ,func ,Integer , String , update
+import sqlalchemy
+from sqlalchemy import ForeignKey ,func ,Integer , String , update,create_engine
 from sqlalchemy.orm import DeclarativeBase ,Mapped ,mapped_column ,relationship ,sessionmaker 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "inventory.db")
 
 
-engine = db.create_engine("sqlite:///inventory.db",connect_args={"autocommit":False},echo=True)
+engine =create_engine("sqlite:///inventory.db",connect_args={"check_same_thread": False},echo=True)
 
 
 logging.basicConfig(filename="logs/db.log",level=logging.INFO)
 
 logging.info("order fetched succesfull")
+
+
 class Base(DeclarativeBase):
     pass
 
 class users(Base):
     __tablename__ = "users"
     id : Mapped[int] = mapped_column(primary_key=True)
-    username : Mapped[str]  = mapped_column(unique=True)
-    password_hash : Mapped[str]
+    username : Mapped[str] = mapped_column(unique=True)
+    hashed_password : Mapped[str] 
     role : Mapped[str] = mapped_column(default="user")
-
-
-def get_db_connection():
-
-    conn = sqlite3.connect(DB_PATH)
-
-    conn.row_factory = sqlite3.Row
-
-    conn.execute("PRAGMA foreign_keys = ON;")
     
-    # print("Connected to Database Succesfully")
-    logging.info("Connected to Database Succesfully")
+class categories(Base):
+    __tablename__ = "categories"
+    category_id : Mapped[int] = mapped_column(primary_key=True)
+    name : Mapped[str] = mapped_column(unique=True)
+class products(Base):
+    __tablename__ = "products"
+    id : Mapped[int]= mapped_column(primary_key=True)
+    name : Mapped[str] = mapped_column(unique=True)
+    purchase_price : Mapped[float]
+    price : Mapped[float]
+    quantity : Mapped[int]
+    min_stock : Mapped[int] = mapped_column(default=5)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.category_id"))
+class logs(Base):
+    __tablename__ = "logs"
+    id : Mapped[int] = mapped_column(primary_key=True)
+    action : Mapped[str]
+    user_id : Mapped[int] = mapped_column(ForeignKey("users.id"))
+    timestamp : Mapped[str] = mapped_column(server_default=func.current_timestamp())
+    #این قسمت جدیده و در فایل قبلی نوشتن زمان رو با پایتون انجام میدادیم ولی اینجا با خوده دیتابیس
+class inventory_logs(Base):
+    __tablename__ = "inventory_logs"
+    id : Mapped[int] = mapped_column(primary_key=True)
+    action : Mapped[str]
+    product_id : Mapped[int] = mapped_column(ForeignKey("products.id"))
+    old_quantity: Mapped[int]
+    new_quantity: Mapped[int]
+    old_price:Mapped[float]
+    new_price: Mapped[float]
+    timestamp  : Mapped[str] = mapped_column(server_default=func.current_timestamp())
+	   
+   
+class sales(Base):
+    __tablename__ = "sales"
+    id : Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    quantity : Mapped[int]
+    unit_price : Mapped[float]
+    total_price : Mapped[float]
+    timestamp :  Mapped[str] = mapped_column(server_default=func.current_timestamp())
 
-    return conn 
+Base.metadata.create_all(engine)
 
-def init_db():
 
-    conn = get_db_connection()
 
-    try:
-        cursor = conn.cursor()
 
-        cursor.execute("""CREATE TABLE IF NOT EXISTS  users(id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            username TEXT UNIQUE NOT NULL,
-                            password_hash TEXT NOT NULL,
-                            role TEXT DEFAULT 'user')""")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def get_db_connection():
+
+#     conn = sqlite3.connect(DB_PATH)
+
+#     conn.row_factory = sqlite3.Row
+
+#     conn.execute("PRAGMA foreign_keys = ON;")
+    
+#     # print("Connected to Database Succesfully")
+#     logging.info("Connected to Database Succesfully")
+
+#     return conn 
+
+# def init_db():
         
-        cursor.execute("""CREATE TABLE IF NOT EXISTS categories(category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            name TEXT UNIQUE NOT NULL)""")
+
         
-        cursor.execute("""CREATE TABLE IF NOT EXISTS  products(id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            name TEXT UNIQUE NOT NULL,
-                            purchase_price REAL NOT NULL DEFAULT 0,
-                            price REAL NOT NULL,
-                            quantity INTEGER NOT NULL,
-                            min_stock INTEGER NOT NULL,
-                            category_id INTEGER ,
-                            FOREIGN KEY (category_id) REFERENCES  categories(category_id))""")
+
+
+    # conn = get_db_connection()
+
+    # try:
+    #     cursor = conn.cursor()
+        
+    #     cursor.execute("""CREATE TABLE IF NOT EXISTS  users(id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #                         username TEXT UNIQUE NOT NULL,
+    #                         password_hash TEXT NOT NULL,
+    #                         role TEXT DEFAULT 'user')""")
+        
+    #     cursor.execute("""CREATE TABLE IF NOT EXISTS categories(category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #                         name TEXT UNIQUE NOT NULL)""")
+        
+    #     cursor.execute("""CREATE TABLE IF NOT EXISTS  products(id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #                         name TEXT UNIQUE NOT NULL,
+    #                         purchase_price REAL NOT NULL DEFAULT 0,
+    #                         price REAL NOT NULL,
+    #                         quantity INTEGER NOT NULL,
+    #                         min_stock INTEGER NOT NULL,
+    #                         category_id INTEGER ,
+    #                         FOREIGN KEY (category_id) REFERENCES  categories(category_id))""")
         # cursor.execute("ALTER TABLE products ADD COLUMN min_stock int NOT NULL DEFAULT 0")
         # cursor.execute("ALTER TABLE products ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
         
@@ -73,55 +142,54 @@ def init_db():
         #                     password TEXT NOT NULL,
         #                     role TEXT DEFAULT "user")
         #             """)
-        cursor.execute("""
+#         cursor.execute("""
 
 
-                            CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            action TEXT ,
-                            timestamp TEXT,
-                            user_id INTEGER,
-                            FOREIGN KEY (user_id) REFERENCES users(id))
+#                             CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                             action TEXT ,
+#                             timestamp TEXT,
+#                             user_id INTEGER,
+#                             FOREIGN KEY (user_id) REFERENCES users(id))
 
-                        """)
-        cursor.execute("""
-                           CREATE TABLE IF NOT EXISTS inventory_logs(id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            action  TEXT,
-                            product_id INTEGER, 
-                            old_quantity REAL,
-                            new_quantity REAL,
-                            old_price REAL,
-                            new_price REAL,
-                            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            FOREIGN KEY (product_id) REFERENCES products(id)
-                        ) 
+#                         """)
+#         cursor.execute("""
+#                            CREATE TABLE IF NOT EXISTS inventory_logs(id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                             action  TEXT,
+#                             product_id INTEGER, 
+#                             old_quantity REAL,
+#                             new_quantity REAL,
+#                             old_price REAL,
+#                             new_price REAL,
+#                             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+#                             FOREIGN KEY (product_id) REFERENCES products(id)
+#                         ) 
 
-                            """)
-        cursor.execute("""
-                       CREATE TABLE IF NOT EXISTS sales(id INTEGER PRIMARY KEY AUTOINCREMENT,
-                       product_id INTEGER,
-                       quantity REAL,
-                       unit_price REAL,
-                       total_price REAL,
-                       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                       FOREIGN KEY (product_id) REFERENCES products(id)
-)""")
-        # cursor.execute("ALTER TABLE sales ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
-        Base.metadata.create_all(engine)
-        conn.commit()
+#                             """)
+#         cursor.execute("""
+#                        CREATE TABLE IF NOT EXISTS sales(id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                        product_id INTEGER,
+#                        quantity REAL,
+#                        unit_price REAL,
+#                        total_price REAL,
+#                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+#                        FOREIGN KEY (product_id) REFERENCES products(id)
+# )""")
+#         # cursor.execute("ALTER TABLE sales ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0")
+        # conn.commit()
 
-        print("We Created Basic Tables successful")
+    #     print("We Created Basic Tables successful")
 
 
-    except Exception as e:
+    # except Exception as e:
     
-        print("ERROR : ",e)
+    #     print("ERROR : ",e)
     
     
-    finally:
+    # finally:
     
-        conn.close()
+    #     conn.close()
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
     
-    init_db()
+#     init_db()
