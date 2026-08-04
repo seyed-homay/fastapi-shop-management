@@ -3,50 +3,210 @@ import sys
 import os
 from services import logs_services
 import datetime
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError , SQLAlchemyError
+from db import db_connection,get_db_connection , Users,Products
 
-from db import get_db_connection
 
 
+def add_product(name, user,price, quantity, purchase_price,
+                 category_id, min_stock,reason):
 
-def add_product(name,price,quantity,category_id,purchase_price,min_stock):
-
-    if price < 0 or quantity < 0 :
+    if purchase_price < 0 or price < 0 or quantity < 0 :
 
         raise ValueError("price and quantity can't be negative ")
-    
-    conn = get_db_connection()
+    session = db_connection()
     try:
 
+        products_detail = Products(name=name,purchase_price = purchase_price
+                                   ,price=price,quantity=quantity,
+                                   min_stock=min_stock,category_id=category_id)   
 
-        cursor = conn.cursor()
-
-        cursor.execute("INSERT INTO products(name, price, quantity, category_id,purchase_price,min_stock) VALUES (?,?,?,?,?,?)"
-                       
-                       ,(name,price,quantity,category_id,purchase_price,min_stock))
-        #این دستور میاد ورودی ها لازم متناسب با جدول رو میگیره و وارد میکنی در جدول
-        product_id =cursor.lastrowid
-        #این دستور میاد اخرین ردیف رو انتخاب میکنه که همون ردیفی که میشه ما وارد کردیم
-        conn.commit()
-        logs_services.add_product("add_product",product_id)
+        session.add(products_detail)
+        session.flush()
+        product_id = products_detail.id
+        
+        logs_services.log_stock_movement(product_id=product_id,user_id=user,action="add_product"
+                                             ,reason=reason,change_quantity=quantity
+                                             ,quantity_after=quantity,session=session)
+        session.commit()
         return True
     
-    except sqlite3.IntegrityError:
-
-        print(f"{name} add to categories unsuccessfull")
-        
+    except IntegrityError as e:
+        session.rollback()
+        # 👈 چاپ کردن orig یا e باعث می‌شود متن دقیق دیتابیس را ببینی
+        print(f"❌ Integrity Error Detail: {e.orig}") 
+        return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        print("Database Error ")
         return False
     
     except Exception as e:
-
-        print("We have error : ",e)
-
-        return False 
+        session.rollback()
+        print(f"❌ Unexpected Error: {e}")
+        return False
     
     finally:
 
-        conn.close()
-    
+        session.close()
+# def update_product(product_id, new_price, new_quantity):
+#     conn = get_db_connection()
+#     try:
+#         cursor = conn.cursor()
+#         old_quantity = cursor.execute("SELECT quantity FROM products WHERE id = ?",(product_id,)).fetchone()[0]
+#         old_price = cursor.execute("SELECT price FROM products WHERE id = ?",(product_id,)).fetchone()[0]
 
+#         query = "UPDATE products SET price = ?, quantity = ? WHERE id = ?"
+#         cursor.execute(query, (new_price, new_quantity, product_id))
+        
+#         # اگر ردیفی تغییر نکرده باشد یعنی آیدی اشتباه است
+#         if cursor.rowcount == 0:
+            
+#             return False
+#         conn.commit()
+#         print("update database succesfull")
+#         logs_services.product_logs("update",product_id,old_quantity,new_quantity,old_price,new_price)    
+#         return True # حتماً این را ریترن کن
+        
+#     except Exception as e:
+#         print("ERROR : ", e)
+#         return False
+#     finally:
+#         conn.close()
+def update_quantity_product(product_id,user_id,action,reason,change_quantity):
+    session = db_connection()
+    try:
+        existing_product = session.query(Products).filter(Products.id == product_id).first()
+        if not existing_product:
+            raise ValueError("product not found")
+
+        quantity = existing_product.quantity
+        quantity_after = quantity + change_quantity 
+        if quantity_after <0:
+            raise ValueError("quantity can't be negative")
+        existing_product.quantity = quantity_after
+        
+        logs_services.log_stock_movement(product_id=product_id,user_id=user_id
+                                         ,action=action,reason=reason,
+                                         change_quantity=change_quantity,
+                                         quantity_after=quantity_after,session=session)
+        session.commit()
+        return True
+
+    except IntegrityError as e:
+        session.rollback()
+        # 👈 چاپ کردن orig یا e باعث می‌شود متن دقیق دیتابیس را ببینی
+        print(f"❌ Integrity Error Detail: {e.orig}") 
+        return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        print("Database Error ")
+        return False
+    
+    except Exception as e:
+        session.rollback()
+        print(f"❌ Unexpected Error: {e}")
+        return False
+    
+    finally:
+
+        session.close()    
+# def delete_product(product_id):
+#     conn = get_db_connection()
+#     try:
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT * FROM products WHERE id = ?",(product_id,))
+#         row = cursor.fetchone()
+#         if row is None:
+#             return "not_found"
+#         if row["quantity"] > 0:
+#             return "has_quantity"
+        
+#         cursor.execute("UPDATE products  SET is_deleted = ? WHERE id = ?",(1,product_id))
+#         print("item is deleted now")
+#         conn.commit()
+#         logs_services.product_logs("DEL Product",product_id,None,None,None,None)  
+#         return "success"
+        
+#     except Exception as e:
+#         print("Error in soft delete:", e)
+#         return "error"
+#     finally:
+#         conn.close()
+def delete_product(product_id):
+    session = db_connection()
+    try:
+        row=session.query(Products).filter(Products.id == product_id).first()
+        if not row:
+            raise ValueError("product not founded")
+        if row.quantity != 0:
+            raise ValueError("product have to zero quantity to be delete")
+        row.is_deleted = 1
+        session.commit()
+        return True
+        
+    except IntegrityError as e:
+        session.rollback()
+        # 👈 چاپ کردن orig یا e باعث می‌شود متن دقیق دیتابیس را ببینی
+        print(f"❌ Integrity Error Detail: {e.orig}") 
+        return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        print("Database Error ")
+        return False
+    
+    except Exception as e:
+        session.rollback()
+        print(f"❌ Unexpected Error: {e}")
+        return False
+    
+    finally:
+
+        session.close()   
+
+def sell_product(product_id,buy_quantity):
+    conn = get_db_connection()
+    alert = None
+    try:
+        cursor = conn.cursor()
+        product_row = cursor.execute("""SELECT name,quantity,price,purchase_price,min_stock FROM products
+                                     WHERE id = ?""",(product_id,)).fetchone()
+        old_quantity = product_row['quantity']
+        name = product_row['name']
+        min_stock = product_row['min_stock']
+        price = product_row['price']
+        purchase_price = product_row['purchase_price']
+        if old_quantity<=0 :
+            raise ValueError("این کالا در انبار موجود نیست")
+        elif buy_quantity > old_quantity:
+            raise ValueError("تعداد موجودی کمتر از درخواست شماست")
+        # old_quantity = cursor.execute("""SELECT quantity FROM products WHERE id = ?"""
+        #                               ,(product_id,)).fetchone()[0]
+        # price = cursor.execute("""SELECT price FROM products WHERE id = ?"""
+        #                                ,(product_id,)).fetchone()[0]
+        # min_stock = cursor.execute("SELECT min_stock FROM products WHERE id = ?",(product_id,)).fetchone()[0]
+        # name = cursor.execute("SELECT name FROM products WHERE id = ?",(product_id,)).fetchone()[0]
+        # price_row = cursor.execute("SELECT price FROM products WHERE id = ?",(product_id,))
+        # price = price_row.fetchone()[0]
+        # purchase_price = cursor.execute("SELECT purchase_price FROM products WHERE id =?",(product_id,))
+        # purchase=purchase_price.fetchone()[0]
+        query = "UPDATE products SET quantity =? WHERE id = ?"
+        new_quantity = old_quantity - buy_quantity
+        if new_quantity <=min_stock:
+            alert = f"this porduct {name} quantity is lower than {min_stock}"
+        total_price = buy_quantity * price
+        cursor.execute(query,(new_quantity,product_id))
+        conn.commit()
+        print("product successfully was sold ")
+        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price,purchase_price)
+        return True
+
+    except Exception as e:
+        print("ERROR : ",e)
+    finally:
+        conn.close()
+        
 def get_product_by_id(product_id):
 
     conn = get_db_connection()
@@ -156,54 +316,7 @@ def add_multiple_products(products):
 #     except Exception as e:
 #         print("ERROR : ",e)
 #     finally:
-        conn.close()
-def update_product(product_id, new_price, new_quantity):
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        old_quantity = cursor.execute("SELECT quantity FROM products WHERE id = ?",(product_id,)).fetchone()[0]
-        old_price = cursor.execute("SELECT price FROM products WHERE id = ?",(product_id,)).fetchone()[0]
-
-        query = "UPDATE products SET price = ?, quantity = ? WHERE id = ?"
-        cursor.execute(query, (new_price, new_quantity, product_id))
-        
-        # اگر ردیفی تغییر نکرده باشد یعنی آیدی اشتباه است
-        if cursor.rowcount == 0:
-            
-            return False
-        conn.commit()
-        print("update database succesfull")
-        logs_services.product_logs("update",product_id,old_quantity,new_quantity,old_price,new_price)    
-        return True # حتماً این را ریترن کن
-        
-    except Exception as e:
-        print("ERROR : ", e)
-        return False
-    finally:
-        conn.close()
-
-def delete_product(product_id):
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM products WHERE id = ?",(product_id,))
-        row = cursor.fetchone()
-        if row is None:
-            return "not_found"
-        if row["quantity"] > 0:
-            return "has_quantity"
-        
-        cursor.execute("UPDATE products  SET is_deleted = ? WHERE id = ?",(1,product_id))
-        print("item is deleted now")
-        conn.commit()
-        logs_services.product_logs("DEL Product",product_id,None,None,None,None)  
-        return "success"
-        
-    except Exception as e:
-        print("Error in soft delete:", e)
-        return "error"
-    finally:
-        conn.close()
+        # conn.close()
 
     
 
@@ -275,47 +388,7 @@ def get_category_total_value():
         conn.close()
     
                
-def sell_product(product_id,buy_quantity):
-    conn = get_db_connection()
-    alert = None
-    try:
-        cursor = conn.cursor()
-        product_row = cursor.execute("""SELECT name,quantity,price,purchase_price,min_stock FROM products
-                                     WHERE id = ?""",(product_id,)).fetchone()
-        old_quantity = product_row['quantity']
-        name = product_row['name']
-        min_stock = product_row['min_stock']
-        price = product_row['price']
-        purchase_price = product_row['purchase_price']
-        if old_quantity<=0 :
-            raise ValueError("این کالا در انبار موجود نیست")
-        elif buy_quantity > old_quantity:
-            raise ValueError("تعداد موجودی کمتر از درخواست شماست")
-        # old_quantity = cursor.execute("""SELECT quantity FROM products WHERE id = ?"""
-        #                               ,(product_id,)).fetchone()[0]
-        # price = cursor.execute("""SELECT price FROM products WHERE id = ?"""
-        #                                ,(product_id,)).fetchone()[0]
-        # min_stock = cursor.execute("SELECT min_stock FROM products WHERE id = ?",(product_id,)).fetchone()[0]
-        # name = cursor.execute("SELECT name FROM products WHERE id = ?",(product_id,)).fetchone()[0]
-        # price_row = cursor.execute("SELECT price FROM products WHERE id = ?",(product_id,))
-        # price = price_row.fetchone()[0]
-        # purchase_price = cursor.execute("SELECT purchase_price FROM products WHERE id =?",(product_id,))
-        # purchase=purchase_price.fetchone()[0]
-        query = "UPDATE products SET quantity =? WHERE id = ?"
-        new_quantity = old_quantity - buy_quantity
-        if new_quantity <=min_stock:
-            alert = f"this porduct {name} quantity is lower than {min_stock}"
-        total_price = buy_quantity * price
-        cursor.execute(query,(new_quantity,product_id))
-        conn.commit()
-        print("product successfully was sold ")
-        logs_services.sell_product_log("sold",product_id,old_quantity,new_quantity,buy_quantity,price,total_price,purchase_price)
-        return True
 
-    except Exception as e:
-        print("ERROR : ",e)
-    finally:
-        conn.close()
 def get_today_total_sales():
     conn = get_db_connection()
     try:
