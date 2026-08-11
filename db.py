@@ -1,7 +1,7 @@
 import sqlite3 ,os,logging
 from datetime import datetime
 import sqlalchemy
-from sqlalchemy import ForeignKey ,func ,Integer , String , update,create_engine,DateTime
+from sqlalchemy import ForeignKey ,func ,Integer , String , update,create_engine,DateTime,text
 from sqlalchemy.orm import DeclarativeBase ,Mapped ,mapped_column ,relationship ,sessionmaker 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +34,7 @@ class Categories(Base):
     name : Mapped[str] = mapped_column(unique=True)
 
 class Products(Base):
+
     __tablename__ = "products"
     id : Mapped[int]= mapped_column(primary_key=True)
     name : Mapped[str] = mapped_column(unique=True)
@@ -42,6 +43,7 @@ class Products(Base):
     quantity : Mapped[int] = mapped_column(server_default="0")
     min_stock : Mapped[int] = mapped_column(default=5)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    is_deleted : Mapped[int] = mapped_column(server_default="0")
 class Logs(Base):
     __tablename__ = "logs"
     id : Mapped[int] = mapped_column(primary_key=True)
@@ -90,7 +92,6 @@ def db_connection():
     session = session_local()
 
     return session
-
 
 def get_db_connection():
 
