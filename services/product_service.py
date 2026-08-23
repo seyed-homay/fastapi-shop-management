@@ -3,7 +3,7 @@ import sys
 import os
 from services import logs_services
 import datetime
-from sqlalchemy import update , select,func
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError , SQLAlchemyError
 from db import db_connection,get_db_connection , Users,Products,Categories
 
@@ -210,114 +210,154 @@ def get_product_by_id(product_id):
 def get_all_product():
     session = db_connection()
     try:
-        result = session.query(Products.name,Products.price,Products.quantity,Products.is_deleted).all()
+        result = session.query(Products.name,Products.price,Products.quantity).filter(Products.is_deleted == 0).all()
         if not result :
-            raise ValueError("Nothing found")
-        return result
+            return []
+        return [dict(row._mapping) for row in result]
     except SQLAlchemyError as e:
         print("Database Error ")
-        return None
+        return []
     
     except Exception as e:
         session.rollback()
         import traceback
         traceback.print_exc()
         print(f"❌ Unexpected Error: {e}")
-        return None
+        return []
     
+
 def get_minstocks_items():
-    conn = get_db_connection()
+    session = db_connection()
     try:
         cursor = conn.cursor()
-        rows = cursor.execute(
-            "SELECT * FROM products" \
-            " WHERE quantity <= min_stock" \
-            " AND quantity != 0").fetchall()
+        rows = cursor.execute("SELECT * FROM products WHERE quantity <= min_stock AND quantity != 0").fetchall()
         #اینجا فقط ردیف هایی که تعدادشون کمتر از حد هشدار هست رو رو برمیگردونیم به غیر از اونایی که مقدارشون صفر
         return rows if rows else []
     except Exception as e:
-        return "error",e
-    finally:
-        conn.close()
+        session.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Unexpected Error: {e}")
+        return []
+    
 
 def get_zerostocks_items():
-    conn = get_db_connection()
+    session = db_connection()
     try:
-        cursor = conn.cursor()
-        rows = cursor.execute("SELECT * FROM products WHERE quantity = 0").fetchall()
-        #گرفتن ایتم هایی که موجودیشون صفر شده
-        return rows if rows else []
+        stmt = select(Products.name,Products.price,Products.quantity).where(
+            Products.quantity==0)
+        results = session.execute(stmt).mappings().all()
+        if not results:
+            return []
+        return results
+    except SQLAlchemyError as e:
+        print("Database Error ")
+        return []
+    
     except Exception as e:
-        return e
-    finally:
-        conn.close()
+        session.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Unexpected Error: {e}")
+        return []
 
-def add_multiple_products(products):
-    conn = get_db_connection()
+
+def add_multiple_products(products,user,reason):
+    session = db_connection()
     try:
-
-        cursor = conn.cursor()
         formatted_products = []
-        for p in products:
-            if isinstance(p, dict):
-                #چک کردن اینکه ایا 
-                formatted_products.append((
-                    p["name"],
-                    p["price"],
-                    p["quantity"],
-                    p["category_id"],
-                    p["purchase_price"],
-                    p["min_stock"]
-                ))
-            else:
-                formatted_products.append(p)
-
-        cursor.executemany("INSERT INTO products(name,price,quantity,category_id,purchase_price,min_stock) VALUES (?,?,?,?,?)",formatted_products)
-
-        print("Insert into product is succesfull")
-
-        conn.commit()
-
-        return True
-    
-    except sqlite3.IntegrityError as e:
-
-        print("Failed to insert products due to integrity error:", e)
         
+        for row in products:
+            if isinstance(row,dict):
+                new_row =Products(**row)
+                purchase_price = row.get("purchase_price", 0)
+                price = row.get("price", 0)
+                quantity = row.get("quantity", 0)
+                if (new_row.purchase_price < 0 
+                    or new_row.price < 0 
+                    or new_row.quantity <0):
+                    raise ValueError("price and quantity can't be negative ")
+                formatted_products.append(new_row)
+            else:
+                session.rollback()
+                print("input data error ")
+                return False
+        session.add_all(formatted_products)
+        session.flush()
+        for row in formatted_products:
+            product_id = row.id
+            quantity = row.quantity
+            logs_services.log_stock_movement(product_id=product_id,user_id=user,action="add_product"
+                                     ,reason=reason,change_quantity=quantity
+                                     ,quantity_after=quantity,session=session)
+
+        session.commit()
+        return True
+        
+    except IntegrityError as e:
+        session.rollback()
+        # 👈 چاپ کردن orig یا e باعث می‌شود متن دقیق دیتابیس را ببینی
+        print(f"❌ Integrity Error Detail: {e.orig}") 
+        return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        print("Database Error ")
         return False
     
     except Exception as e:
-        print("Unexpected error:", e)
+        session.rollback()
+        print(f"❌ Unexpected Error: {e}")
         return False
-
-
+    
     finally:
 
-        conn.close()
-    
+        session.close()
 
+
+
+                
+
+# def search_product(keyword):
+#     conn = get_db_connection()
+#     try:
+#         cursor = conn.cursor()
+#         query = """
+#                 SELECT p.id , p.name , c.name as category ,p.price , p.quantity
+#                 FROM products p join categories c ON p.category_id = c.category_id
+#                 WHERE p.name LIKE ? AND p.is_deleted = 0
+#                  """
+#         cursor.execute(query,(f"%{keyword}%",))
+
+#         rows = cursor.fetchall()
+
+#         return [dict(row) for row in rows]
+         
+#     except Exception as e:
+#         print("ERROR = ",e)
+#     finally:
+#         conn.close()
 
 def search_product(keyword):
-    conn = get_db_connection()
+    session = db_connection()
     try:
-        cursor = conn.cursor()
-        query = """
-                SELECT p.id , p.name , c.name as category ,p.price , p.quantity
-                FROM products p join categories c ON p.category_id = c.category_id
-                WHERE p.name LIKE ? AND p.is_deleted = 0
-                 """
-        cursor.execute(query,(f"%{keyword}%",))
-
-        rows = cursor.fetchall()
-
-        return [dict(row) for row in rows]
-         
+        stmt = select(Products.id,Products.name,Products.price,Products.quantity).where(Products.name.like(f"%{keyword}%"),Products.is_deleted == 0)
+        results = session.execute(stmt).mappings().all()
+        if not results:
+            return []
+        return [dict(row) for row in results]
+    except SQLAlchemyError as e:
+        print("Database Error ")
+        return []
+    
     except Exception as e:
-        print("ERROR = ",e)
+        session.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Unexpected Error: {e}")
+        return []
     finally:
-        conn.close()
-
-
+        session.close()
+        
 def get_product_price_filter(number):
     conn = get_db_connection()
     try:
@@ -490,7 +530,17 @@ def get_profit_of_sales(time):
 #         return False
 #     finally:
 #         conn.close()
-
+# def get_zerostocks_items():
+#     conn = get_db_connection()
+#     try:
+#         cursor = conn.cursor()
+#         rows = cursor.execute("SELECT * FROM products WHERE quantity = 0").fetchall()
+#         #گرفتن ایتم هایی که موجودیشون صفر شده
+#         return rows if rows else []
+#     except Exception as e:
+#         return e
+#     finally:
+#         conn.close()
 
 # def delete_product(product_id):
 #     conn = get_db_connection()
@@ -530,7 +580,17 @@ def get_profit_of_sales(time):
 #         print("ERROR : ",e)
 #     finally:
         # conn.close()
-
+# def get_minstocks_items():
+#     conn = get_db_connection()
+#     try:
+#         cursor = conn.cursor()
+#         rows = cursor.execute("SELECT * FROM products WHERE quantity <= min_stock AND quantity != 0").fetchall()
+#         #اینجا فقط ردیف هایی که تعدادشون کمتر از حد هشدار هست رو رو برمیگردونیم به غیر از اونایی که مقدارشون صفر
+#         return rows if rows else []
+#     except Exception as e:
+#         return "error",e
+#     finally:
+#         conn.close()
     # def sell_product(product_id,buy_quantity):
 #     conn = get_db_connection()
 #     alert = None
@@ -573,3 +633,46 @@ def get_profit_of_sales(time):
 #     finally:
 #         conn.close()
         
+    
+# def add_multiple_products(products):
+#     conn = get_db_connection()
+#     try:
+
+#         cursor = conn.cursor()
+#         formatted_products = []
+#         for p in products:
+#             if isinstance(p, dict):
+#                 #چک کردن اینکه ایا 
+#                 formatted_products.append((
+#                     p["name"],
+#                     p["price"],
+#                     p["quantity"],
+#                     p["category_id"],
+#                     p["purchase_price"],
+#                     p["min_stock"]
+#                 ))
+#             else:
+#                 formatted_products.append(p)
+
+#         cursor.executemany("INSERT INTO products(name,price,quantity,category_id,purchase_price,min_stock) VALUES (?,?,?,?,?)",formatted_products)
+
+#         print("Insert into product is succesfull")
+
+#         conn.commit()
+
+#         return True
+    
+#     except sqlite3.IntegrityError as e:
+
+#         print("Failed to insert products due to integrity error:", e)
+        
+#         return False
+    
+#     except Exception as e:
+#         print("Unexpected error:", e)
+#         return False
+
+
+#     finally:
+
+#         conn.close()
