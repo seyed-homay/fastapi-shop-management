@@ -3,9 +3,9 @@ import sys
 import os
 from services import logs_services
 import datetime
-from sqlalchemy import update
+from sqlalchemy import update , select,func
 from sqlalchemy.exc import IntegrityError , SQLAlchemyError
-from db import db_connection,get_db_connection , Users,Products
+from db import db_connection,get_db_connection , Users,Products,Categories
 
 
 
@@ -229,7 +229,10 @@ def get_minstocks_items():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        rows = cursor.execute("SELECT * FROM products WHERE quantity <= min_stock AND quantity != 0").fetchall()
+        rows = cursor.execute(
+            "SELECT * FROM products" \
+            " WHERE quantity <= min_stock" \
+            " AND quantity != 0").fetchall()
         #اینجا فقط ردیف هایی که تعدادشون کمتر از حد هشدار هست رو رو برمیگردونیم به غیر از اونایی که مقدارشون صفر
         return rows if rows else []
     except Exception as e:
@@ -361,7 +364,38 @@ def get_category_total_value():
     finally:
         conn.close()
     
-               
+def get_category_total_value():
+    session = db_connection()
+    try:
+        total_calc = func.sum(Products.price * Products.quantity).label("total_value")
+        stmt = (
+                select(Categories.name, total_calc)
+                .join(Categories)
+                .where(Products.is_deleted == 0)
+                .group_by(Categories.id)
+                .order_by(total_calc.desc()) 
+            )
+        total = session.execute(stmt).mappings().all()
+        if not total:
+            return []
+        return total
+        
+
+    except SQLAlchemyError as e:
+        print("Database Error ")
+        session.rollback()
+        return None
+    
+    except Exception as e:
+        session.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Unexpected Error: {e}")
+        return None
+    
+    finally:
+
+        session.close()
 
 def get_today_total_sales():
     conn = get_db_connection()
