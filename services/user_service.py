@@ -13,10 +13,10 @@ def register_user(username,password,role='user'):
     try:
         cursor = conn.cursor()
         cursor.execute("""
-                        INSERT INTO users(username,password_hash,role) VALUES (?,?,?)
+                        INSERT INTO users(username,hashed_password,role) VALUES (?,?,?)
                         """,(username,hashed_pw,role))
         user =  cursor.lastrowid
-        logs_services.insert_user_logs("Register",datetime.datetime.now().strftime("%d.%m.%Y"),user)
+        logs_services.insert_user_logs("Register",user)
         print("The user is added")
         conn.commit()
         return True
@@ -38,10 +38,10 @@ def login(username,password):
         
         
         
-        if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash']):
+        if user and bcrypt.checkpw(password.encode('utf-8'), user['hashed_password']):
             print("[Login success ")
             print(f"[role is {user['role']}]")
-            logs_services.insert_user_logs("Login",datetime.datetime.now().strftime("%d.%m.%Y"),user["id"])
+            logs_services.insert_user_logs("Login",user["id"])
             print("succesfully loged in")
             return user
             

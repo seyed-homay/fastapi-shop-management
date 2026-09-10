@@ -9,8 +9,8 @@ class ProductCreate(BaseModel):
     name: str
     price: float
     quantity: int
-    category_id: int # اختیاری
     purchase_price: float
+    category_id: int 
     min_stock : int = 5
     
 
