@@ -1,7 +1,7 @@
 import sqlite3
 import sys
 import os
-
+from sqlalchemy.exc import IntegrityError
 current_file_path = os.path.abspath(__file__)
 services_dir = os.path.dirname(current_file_path)
 project_root = os.path.dirname(services_dir) # اینجا میشه پوشه inventory_manager
@@ -9,21 +9,24 @@ project_root = os.path.dirname(services_dir) # اینجا میشه پوشه inve
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from db import get_db_connection
+from db import get_db_connection ,db_connection,Categories
 
 
 def add_category(name):
 
-    conn = get_db_connection()
-
+    # conn = get_db_connection()
+    session = db_connection()
     try:
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO categories(name) VALUES (?) ",(name,))
-        conn.commit()
+        # cursor = conn.cursor()
+        # cursor.execute("INSERT INTO categories(name) VALUES (?) ",(name,))
+        new_category = Categories(name=name)
+        result = session.add(new_category)
+        session.commit()
+        # conn.commit()
         print(f"{name} added to categories successfully")
         return True
     
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         print(f"{name} add to categories unsuccessfull")
         return False
     
@@ -32,8 +35,8 @@ def add_category(name):
         return False 
 
     finally:
-
-        conn.close()        
+        session.close()
+        # conn.close()        
 
 
 def get_all_categories():

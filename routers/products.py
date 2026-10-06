@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException , Depends
-from pydantic import BaseModel
 from services import product_service
 from typing import List
 import jwt
@@ -9,10 +8,11 @@ class ProductCreate(BaseModel):
     name: str
     price: float
     quantity: int
-    category_id: int # اختیاری
     purchase_price: float
+    category_id: int 
     min_stock : int = 5
     
+    min_stock : int = 5
 
 class InvoiceItem(BaseModel):
     product_id : int

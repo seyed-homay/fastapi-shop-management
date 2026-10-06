@@ -1,8 +1,7 @@
-import sqlite3 
-import os
-import logging
+import sqlite3 ,os,logging
+from datetime import datetime
 import sqlalchemy
-from sqlalchemy import ForeignKey ,func ,Integer , String , update,create_engine
+from sqlalchemy import ForeignKey ,func ,Integer , String , update,create_engine,DateTime,text
 from sqlalchemy.orm import DeclarativeBase ,Mapped ,mapped_column ,relationship ,sessionmaker 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,90 +19,114 @@ logging.info("order fetched succesfull")
 class Base(DeclarativeBase):
     pass
 
-class users(Base):
+
+class Users(Base):
     __tablename__ = "users"
     id : Mapped[int] = mapped_column(primary_key=True)
     username : Mapped[str] = mapped_column(unique=True)
     hashed_password : Mapped[str] 
-    role : Mapped[str] = mapped_column(default="user")
+    role : Mapped[str] = mapped_column(server_default="user")
+
     
-class categories(Base):
+class Categories(Base):
     __tablename__ = "categories"
-    category_id : Mapped[int] = mapped_column(primary_key=True)
+    id : Mapped[int] = mapped_column(primary_key=True)
     name : Mapped[str] = mapped_column(unique=True)
-class products(Base):
+
+class Products(Base):
+
     __tablename__ = "products"
     id : Mapped[int]= mapped_column(primary_key=True)
     name : Mapped[str] = mapped_column(unique=True)
-    purchase_price : Mapped[float]
-    price : Mapped[float]
-    quantity : Mapped[int]
+    purchase_price : Mapped[float] = mapped_column(server_default="0.0")
+    price : Mapped[float] = mapped_column(server_default="0.0")
+    quantity : Mapped[int] = mapped_column(server_default="0")
     min_stock : Mapped[int] = mapped_column(default=5)
-    category_id: Mapped[int] = mapped_column(ForeignKey("categories.category_id"))
-class logs(Base):
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    is_deleted : Mapped[int] = mapped_column(server_default="0")
+class Logs(Base):
     __tablename__ = "logs"
     id : Mapped[int] = mapped_column(primary_key=True)
     action : Mapped[str]
     user_id : Mapped[int] = mapped_column(ForeignKey("users.id"))
-    timestamp : Mapped[str] = mapped_column(server_default=func.current_timestamp())
-    #این قسمت جدیده و در فایل قبلی نوشتن زمان رو با پایتون انجام میدادیم ولی اینجا با خوده دیتابیس
-class inventory_logs(Base):
-    __tablename__ = "inventory_logs"
+    timestamp :Mapped[datetime] = mapped_column(DateTime,server_default=func.current_timestamp())
+    
+class StockMovement(Base):
+    __tablename__="stock_movements"
     id : Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    user_id : Mapped[int] =mapped_column(ForeignKey("users.id"))
     action : Mapped[str]
-    product_id : Mapped[int] = mapped_column(ForeignKey("products.id"))
-    old_quantity: Mapped[int]
-    new_quantity: Mapped[int]
-    old_price:Mapped[float]
-    new_price: Mapped[float]
-    timestamp  : Mapped[str] = mapped_column(server_default=func.current_timestamp())
-	   
-   
-class sales(Base):
+    reason: Mapped[str | None] = mapped_column(nullable=True)
+    change_quantity : Mapped[int]
+    quantity_after : Mapped[int]
+    timestamp :Mapped[datetime] = mapped_column(DateTime,server_default=func.current_timestamp())
+
+class PriceHistory(Base):
+    __tablename__ = "price_histories"
+    id : Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    user_id : Mapped[int] =mapped_column(ForeignKey("users.id"))
+    new_price : Mapped[float]
+    previous_price: Mapped[float | None] = mapped_column(nullable=True)
+    reason: Mapped[str | None] = mapped_column(nullable=True)
+    timestamp :Mapped[datetime] = mapped_column(DateTime,server_default=func.current_timestamp())
+    
+class Sales(Base):
     __tablename__ = "sales"
     id : Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    user_id : Mapped[int] =mapped_column(ForeignKey("users.id"))
     quantity : Mapped[int]
     unit_price : Mapped[float]
     total_price : Mapped[float]
-    timestamp :  Mapped[str] = mapped_column(server_default=func.current_timestamp())
+    timestamp :Mapped[datetime] = mapped_column(DateTime,server_default=func.current_timestamp())
 
 Base.metadata.create_all(engine)
 
 
+session_local = sessionmaker(bind=engine,autocommit=False,autoflush=False)
 
 
+def db_connection():
+    session = session_local()
 
+    return session
 
+def get_db_connection():
 
+    conn = sqlite3.connect(DB_PATH)
 
+    conn.row_factory = sqlite3.Row
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def get_db_connection():
-
-#     conn = sqlite3.connect(DB_PATH)
-
-#     conn.row_factory = sqlite3.Row
-
-#     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA foreign_keys = ON;")
     
-#     # print("Connected to Database Succesfully")
-#     logging.info("Connected to Database Succesfully")
+    # print("Connected to Database Succesfully")
+    logging.info("Connected to Database Succesfully")
 
-#     return conn 
+    return conn 
 
+#delete inventory logs
+# Base.metadata.tables['inventory_logs'].drop(bind=engine)
+# Base.metadata.tables['logs'].drop(bind=engine)
+# Base.metadata.tables['stock_movements'].drop(bind=engine)
+# Base.metadata.tables['price_histories'].drop(bind=engine)
+# Base.metadata.tables['sales'].drop(bind=engine)
+# Base.metadata.tables['users'].drop(bind=engine)
+# Base.metadata.tables['products'].drop(bind=engine)
+# Base.metadata.tables['categories'].drop(bind=engine)
+
+#این قسمت جدیده و در فایل قبلی نوشتن زمان رو با پایتون انجام میدادیم ولی اینجا با خوده دیتابیس
+# class inventory_logs(Base):
+#     __tablename__ = "inventory_logs"
+#     id : Mapped[int] = mapped_column(primary_key=True)
+#     action : Mapped[str]
+#     product_id : Mapped[int] = mapped_column(ForeignKey("products.id"))
+#     old_quantity: Mapped[int]
+#     new_quantity: Mapped[int]
+#     old_price:Mapped[float]
+#     new_price: Mapped[float]
+#     timestamp  : Mapped[str] = mapped_column(se   rver_default=func.current_timestamp())
 # def init_db():
         
 
