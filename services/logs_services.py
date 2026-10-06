@@ -1,7 +1,7 @@
 from db import get_db_connection,db_connection,Products,Users,Logs,StockMovement,PriceHistory,Sales
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-
+from datetime import datetime
 def insert_user_logs(action,user_id):
     
     conn = get_db_connection()
@@ -118,7 +118,7 @@ def sell_product_log(product_id:int
 
     try:
         log_entry = Sales(product_id=product_id,user_id=user_id,quantity=quantity,unit_price=unit_price
-                          ,total_price=total_price)
+                          ,total_price=total_price,timestamp=datetime.now().replace(microsecond=0))
         local_session.add(log_entry)
 
         if not is_external_session:
