@@ -1,6 +1,5 @@
 csv_item.csv
 inventory.db
-main.py
 test_users.py
 /reports
 /cli
@@ -9,3 +8,4 @@ routers/__pycache__/
 services/__pycache__/
 __pycache__/
 sqlalchemy_test/
+test.py
