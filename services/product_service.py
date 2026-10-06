@@ -3,9 +3,9 @@ import sys
 import os
 from services import logs_services
 import datetime
-from sqlalchemy import update
+from sqlalchemy import update , select , func
 from sqlalchemy.exc import IntegrityError , SQLAlchemyError
-from db import db_connection,get_db_connection , Users,Products,Categories
+from db import db_connection,get_db_connection , Users,Products,Categories,Sales
 
 
 
@@ -436,21 +436,49 @@ def get_category_total_value():
     finally:
 
         session.close()
+from datetime import date  # 👈 حتماً این را در بالای فایل ایمپورت کن
 
-def get_today_total_sales():
-    conn = get_db_connection()
+def get_today_total_sales2():
+    session = db_connection()
     try:
-        cursor = conn.cursor()
+        # گرفتن تاریخ دقیق امروز از سیستم‌عامل پایتون (فرمت YYYY-MM-DD)
+        today_str = date.today().isoformat()
+
+        # شرط: فقط رکوردهایی که تاریخ استخراج‌شده‌شان با تاریخ امروز پایتون برابر است
+        stmt = select(func.sum(Sales.total_price)).where(
+            func.date(Sales.timestamp) == today_str
+        )
         
-        today_total_prices = cursor.execute("""SELECT SUM(total_price) FROM sales WHERE DAtE(timestamp) = DATE(current_timestamp)""")
-        today_total = today_total_prices.fetchone()[0]
-        if today_total == None or today_total == "null":
-            return {"total_sales" : 0} 
-        return {"total_sales":today_total[0]}
+        total = session.execute(stmt).scalar()
+        return total if total is not None else 0.0
+
+    except SQLAlchemyError as e:
+        print("Database Error:", e)
+        session.rollback()
+        return None
     except Exception as e:
-        print("ERROR : ",e)
+        session.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Unexpected Error: {e}")
+        return None
     finally:
-        conn.close()
+        session.close()
+# def get_today_total_sales():
+#     conn = get_db_connection()
+#     try:
+#         cursor = conn.cursor()
+#
+#         today_total_prices = cursor.execute("""SELECT SUM(total_price) 
+#         FROM sales WHERE DAtE(timestamp) = DATE(current_timestamp)""")
+#         today_total = today_total_prices.fetchone()[0]
+#         if today_total == None or today_total == "null":
+#             return {"total_sales" : 0} 
+#         return {"total_sales":today_total}
+#     except Exception as e:
+#         print("ERROR : ",e)
+#     finally:
+#         conn.close()
 def get_total_sales_with_time(first_date:str,second_date:str):
     conn = get_db_connection()
     try:
@@ -498,7 +526,7 @@ def get_profit_of_sales(time):
 #         cursor = conn.cursor()
 #         cursor.execute("SELECT * FROM products  WHERE id = ? ",(product_id,))
 #         row = cursor.fetchone()
-#         #آیتم مورد نظر رو پیدا میکنه و کل ردیف رو به صورت دیکشنری برمیگردونه
+#         #آیدا میکنه و کل ردیف رو به صورت دیکشنری برمیگردونه
 #         return dict(row) if row else None
     
 #     except Exception as e:
